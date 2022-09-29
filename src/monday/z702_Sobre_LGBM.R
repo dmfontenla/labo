@@ -20,12 +20,12 @@ require("ggplot2")
 require("lightgbm")
 
 # Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
 # Cargamos los datasets y nos quedamos solo con 202101 y 202103
-dataset <- fread("./datasets/competencia2_2022.csv.gz")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia2_2022.csv")
 marzo <- dataset[foto_mes == 202103]
 rm(dataset)
 
@@ -130,8 +130,13 @@ model_lgbm_cv <- lgb.cv(
 model_lgbm_cv$best_iter
 model_lgbm_cv$best_score
 
-model_lgbm_cv$record_evals
+mean()
+model_lgbm_cv$boosters
+model_lgbm_cv['l1-mean']
 
+mean( unlist( model_lgbm_cv$record_evals$valid$ganancia$eval ) )  
+
+names(model_lgbm_cv$record_evals[["test"]])
 # Armamos el modelo:
 model_lgm <- lightgbm(
     data = dtrain,

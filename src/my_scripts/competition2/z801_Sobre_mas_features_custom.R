@@ -18,6 +18,7 @@ require("ggplot2")
 require("lightgbm")
 install.packages("xgboost")
 require("xgboost")
+source("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/labo/src/my_scripts/competition2/feature_engineering.r")
 
 # Poner la carpeta de la materia de SU computadora local
 setwd("./")
@@ -36,6 +37,8 @@ clase_binaria <- ifelse(marzo$clase_ternaria == "CONTINUA", 0, 1)
 clase_real <- marzo$clase_ternaria
 marzo$clase_ternaria <- NULL
 mayo$clase_ternaria <- NULL
+
+marzo <- do_feature_engineering(marzo)
 
 ## ---------------------------
 ## Step 2: XGBoost, un modelo simple ...

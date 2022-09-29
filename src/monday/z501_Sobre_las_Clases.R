@@ -14,22 +14,24 @@
 rm(list = ls())
 gc(verbose = FALSE)
 
+install.packages("treeClust")
+
 # Librerías necesarias
 require("data.table")
 require("rpart")
 require("treeClust")
 require("ggplot2")
 
-# Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
-# Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
 
-# Cargamos el dataset
-dataset <- fread("./datasets/competencia1_2022.csv")
+# Aqui se debe poner la carpeta de la materia de SU computadora local
+setwd("./") # Establezco el Working Directory
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
-# Nos quedamos solo con el 202101
-dataset <- dataset[foto_mes == 202101]
+# cargo el dataset
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
+
+dlearn <- dataset[foto_mes == 202101] # defino donde voy a entrenar
+dapply <- dataset[foto_mes == 202103] # defino donde voy a aplicar el modelo
 
 
 ## ---------------------------
@@ -179,6 +181,7 @@ train_bin2[p >= 0.025, sum(gan) / 0.7]
 
 # Podemos buscar el punto de corte optimo con un par de sentencias de R
 pos_max_gan <- which.max(train_bin2$gan_acum)
+pos_max_gan
 # La ganancia máxima
 train_bin2[pos_max_gan, gan_acum]
 
@@ -281,3 +284,4 @@ for (s in semillas) {
 ## - ¿Qué estrategia piensa que puede ser útil para elegir el punto de corte?
 ## - ¿Para la búsqueda del mejor modelo que valor va a usar para la OB?
 ## - ¿Pros y contras de elegir los N mejores casos?
+

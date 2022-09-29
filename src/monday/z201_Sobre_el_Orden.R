@@ -16,12 +16,12 @@ require("ggplot2")
 
 
 # Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
 semillas <- c(17, 19, 23, 29, 31)
 
 # Cargamos el dataset
-dataset <- fread("./datasets/competencia1_2022.csv")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 dtrain <- dataset[foto_mes == 202101]
 
 # Generamos el primer modelo

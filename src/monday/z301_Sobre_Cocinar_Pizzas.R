@@ -24,12 +24,12 @@ require("DiceKriging")
 require("mlrMBO")
 
 # Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
 # Cargamos el dataset
-dataset <- fread("./datasets/competencia1_2022.csv")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 
 # Nos quedamos solo con el 202101
 dataset <- dataset[foto_mes == 202101]
@@ -388,3 +388,47 @@ print(run_md_ms)
 ## Agregue todos los parámetros que considere. Una vez que tenga sus mejores
 ## parámetros, haga una copia del script rpart/z101_PrimerModelo.R, cambie los
 ## parámetros dentro del script, ejecutelo y suba a Kaggle su modelo.
+
+
+
+## ---------------------------
+## Step 11: Buscando con una Opt 3. Bayesiana para 3 parámetros
+## ---------------------------
+
+set.seed(semillas[1])
+obj_fun_md_ms <- function(x) {
+  experimento_rpart(dataset, semillas
+            , md = x$maxdepth
+            , ms = x$minsplit
+            , mb = x$minbucket)
+}
+
+obj_fun <- makeSingleObjectiveFunction(
+  minimize = FALSE,
+  fn = obj_fun_md_ms,
+  par.set = makeParamSet(
+    makeIntegerParam("maxdepth",  lower = 4L, upper = 20L),
+    makeIntegerParam("minsplit",  lower = 100L, upper = 1000L),
+    makeNumericParam("minbucket",  lower = 10L, upper = 500L)
+    # makeNumericParam <- para parámetros continuos
+  ),
+  # noisy = TRUE,
+  has.simple.signature = FALSE
+)
+
+ctrl <- makeMBOControl()
+ctrl <- setMBOControlTermination(ctrl, iters = 16L)
+ctrl <- setMBOControlInfill(
+  ctrl,
+  crit = makeMBOInfillCritEI(),
+  opt = "focussearch",
+  # sacar parámetro opt.focussearch.points en próximas ejecuciones
+  opt.focussearch.points = 500
+)
+
+lrn <- makeMBOLearner(ctrl, obj_fun)
+
+surr_km <- makeLearner("regr.km", predict.type = "se", covtype = "matern3_2")
+
+run_md_ms <- mbo(obj_fun, learner = surr_km, control = ctrl, )
+print(run_md_ms)

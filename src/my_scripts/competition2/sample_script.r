@@ -10,11 +10,12 @@
 
 # NO utiliza Feature Engineering  ( el Fiscal General se enoja ... )
 
+options(scipen=999)
 
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
-
+install.packages("rlist")
 require("data.table")
 require("rlist")
 
@@ -24,20 +25,15 @@ require("parallel")
 #paquetes necesarios para la Bayesian Optimization
 require("DiceKriging")
 require("mlrMBO")
+setwd("./") # Establezco el Working Directory
+source("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/labo/src/my_scripts/competition2/optimization.r")
+#dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 
 #aqui deben ir SUS semillas, se usan para  1-Repeated  (5-Fold Cross Validation)
-ksemilla_azar  <- c(864379, 300647, 125707, 962303, 983363)
+ksemilla_azar  <- c(864379)
 
 
 #Defino la  Optimizacion Bayesiana
-
-kBO_iter  <- 100   #cantidad de iteraciones de la Optimizacion Bayesiana
-
-hs  <- makeParamSet(
-          makeNumericParam("minsplit" , lower=   100,   upper= 3000 ),
-          makeNumericParam("minbucket", lower=   10,   upper= 1000 ),
-          makeIntegerParam("maxdepth" , lower=   3L,  upper=   20L),  #la letra L al final significa ENTERO
-          forbidden = quote( minbucket > 0.5*minsplit ) )             # minbuket NO PUEDE ser mayor que la mitad de minsplit
 
 
 #------------------------------------------------------------------------------
@@ -112,8 +108,8 @@ ArbolSimple  <- function( fold_test, data, param )
   dtest2   <- dtest[ (1:100)*100,  ]
   idx_max  <- which.max( dtest2$gan_acum ) 
   ganancia_testing  <- dtest2[ (idx_max-1):(idx_max+1),  mean(gan_acum) ]
-
-
+  print(dtest)
+  print(dtest2)
   rm( dtest )
   rm( dtest2 )
 
@@ -170,9 +166,9 @@ EstimarGanancia  <- function( x )
    return( xx$ganancia )
 }
 #------------------------------------------------------------------------------
-#Aqui empieza el programa
 
-setwd( "./" )
+
+setwd("./") # Establezco el Working Directory
 
 #cargo el dataset, aqui debe poner  SU RUTA
 dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
@@ -183,56 +179,32 @@ dataset[ foto_mes==202101, clase_binaria :=  ifelse( clase_ternaria=="CONTINUA",
 #defino los datos donde entreno
 dtrain  <- dataset[ foto_mes==202101, ]
 
+GLOBAL_iteracion  <- 0
+
+
+kBO_iter  <- 100   #cantidad de iteraciones de la Optimizacion Bayesiana
+
+hs  <- makeParamSet(
+          makeNumericParam("cp"       , lower=  -1.0, upper=    0.1),
+          makeNumericParam("minsplit" , lower=   1,   upper= 5000 ),
+          makeNumericParam("minbucket", lower=   1,   upper= 1000 ),
+          makeIntegerParam("maxdepth" , lower=   3L,  upper=   20L),  #la letra L al final significa ENTERO
+          forbidden = quote( minbucket > 0.5*minsplit ) )             # minbuket NO PUEDE ser mayor que la mitad de minsplit
 
 #creo la carpeta donde va el experimento
 # HT  representa  Hiperparameter Tuning
-dir.create( "./exp/",  showWarnings = FALSE ) 
-dir.create( "./exp/HT4111/", showWarnings = FALSE )
-setwd("./exp/HT4111/")   #Establezco el Working Directory DEL EXPERIMENTO
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB/",  showWarnings = TRUE ) 
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB/test/", showWarnings = TRUE )
+setwd("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB/test/")   #Establezco el Working Directory DEL EXPERIMENTO
 
 #defino los archivos donde guardo los resultados de la Bayesian Optimization
-archivo_log  <- "HT4111.txt"
-archivo_BO   <- "HT4111.RDATA"
-
-#leo si ya existe el log, para retomar en caso que se se corte el programa
-GLOBAL_iteracion  <- 0
+archivo_log  <- paste0("HB-",format(Sys.time(), "%Y%m%d %H%M%S"),".txt")
+archivo_BO   <- paste0("HB-",format(Sys.time(), "%Y%m%d %H%M%S"),".RDATA")
 
 if( file.exists(archivo_log) )
 {
- tabla_log  <- fread( archivo_log )
- GLOBAL_iteracion  <- nrow( tabla_log )
+    tabla_log  <- fread( archivo_log )
+    GLOBAL_iteracion  <- nrow( tabla_log )
 }
 
-
-
-#Aqui comienza la configuracion de la Bayesian Optimization
-
-funcion_optimizar  <- EstimarGanancia
-
-configureMlr( show.learner.output= FALSE)
-
-#configuro la busqueda bayesiana,  los hiperparametros que se van a optimizar
-#por favor, no desesperarse por lo complejo
-obj.fun  <- makeSingleObjectiveFunction(
-              fn=       funcion_optimizar,
-              minimize= FALSE,   #estoy Maximizando la ganancia
-              noisy=    TRUE,
-              par.set=  hs,
-              has.simple.signature = FALSE   #espia Tomas Delvechio, dejar este parametro asi
-             )
-
-ctrl  <- makeMBOControl( save.on.disk.at.time= 600,  save.file.path= archivo_BO)
-ctrl  <- setMBOControlTermination(ctrl, iters= kBO_iter )
-ctrl  <- setMBOControlInfill(ctrl, crit= makeMBOInfillCritEI())
-
-surr.km  <- makeLearner("regr.km", predict.type= "se", covtype= "matern3_2", control= list(trace= TRUE))
-
-#inicio la optimizacion bayesiana
-if( !file.exists( archivo_BO ) ) {
-
-  run  <- mbo( fun=     obj.fun, 
-               learner= surr.km,
-               control= ctrl)
-
-} else  run  <- mboContinue( archivo_BO )   #retomo en caso que ya exista
-
+bayes_optimization(EstimarGanancia, hs, kBO_iter)

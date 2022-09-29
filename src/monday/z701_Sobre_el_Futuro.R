@@ -23,12 +23,12 @@ require("ggplot2")
 require("lightgbm")
 
 # Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
 # Cargamos los datasets y nos quedamos solo con 202101 y 202103
-dataset <- fread("./datasets/competencia2_2022.csv.gz")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia2_2022.csv")
 enero <- dataset[foto_mes == 202101]
 marzo <- dataset[foto_mes == 202103]
 
@@ -55,6 +55,7 @@ model_lgm <- lightgbm(data = dtrain,
 ## ---------------------------
 ## Step 3: Veamos como funcionó en Marzo
 ## ---------------------------
+model_lgm
 
 marzo$pred <- predict(model_lgm, data.matrix(marzo[, 1:154]))
 sum((marzo$pred > 0.025) * ifelse(marzo$clase_ternaria == "BAJA+2", 78000, -2000))
@@ -98,10 +99,10 @@ sum((marzo$pred[-split] > 0.025) * ifelse(marzo$clase_ternaria[-split] == "BAJA+
 setorder(marzo, cols = -pred)
 
 # PROBAR MULTIPLES VALORES
-set.seed(semillas[3])
+set.seed(semillas[1])
 m <- 500
 f <- 2000
-t <- 12000
+t <- 22000
 
 leaderboad <- data.table()
 split <- caret::createDataPartition(marzo$clase_ternaria, p = 0.50, list = FALSE)

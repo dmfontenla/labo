@@ -10,11 +10,12 @@
 
 # NO utiliza Feature Engineering  ( el Fiscal General se enoja ... )
 
+options(scipen=999)
 
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
-
+install.packages("rlist")
 require("data.table")
 require("rlist")
 
@@ -26,7 +27,7 @@ require("DiceKriging")
 require("mlrMBO")
 
 #aqui deben ir SUS semillas, se usan para  1-Repeated  (5-Fold Cross Validation)
-ksemilla_azar  <- c(864379, 300647, 125707, 962303, 983363)
+ksemilla_azar  <- c(864379)
 
 
 #Defino la  Optimizacion Bayesiana
@@ -34,8 +35,9 @@ ksemilla_azar  <- c(864379, 300647, 125707, 962303, 983363)
 kBO_iter  <- 100   #cantidad de iteraciones de la Optimizacion Bayesiana
 
 hs  <- makeParamSet(
-          makeNumericParam("minsplit" , lower=   100,   upper= 3000 ),
-          makeNumericParam("minbucket", lower=   10,   upper= 1000 ),
+          makeNumericParam("cp"       , lower=  -1.0, upper=    0.1),
+          makeNumericParam("minsplit" , lower=   1,   upper= 5000 ),
+          makeNumericParam("minbucket", lower=   1,   upper= 1000 ),
           makeIntegerParam("maxdepth" , lower=   3L,  upper=   20L),  #la letra L al final significa ENTERO
           forbidden = quote( minbucket > 0.5*minsplit ) )             # minbuket NO PUEDE ser mayor que la mitad de minsplit
 
@@ -112,8 +114,8 @@ ArbolSimple  <- function( fold_test, data, param )
   dtest2   <- dtest[ (1:100)*100,  ]
   idx_max  <- which.max( dtest2$gan_acum ) 
   ganancia_testing  <- dtest2[ (idx_max-1):(idx_max+1),  mean(gan_acum) ]
-
-
+  print(dtest)
+  print(dtest2)
   rm( dtest )
   rm( dtest2 )
 
@@ -172,7 +174,7 @@ EstimarGanancia  <- function( x )
 #------------------------------------------------------------------------------
 #Aqui empieza el programa
 
-setwd( "./" )
+setwd("./") # Establezco el Working Directory
 
 #cargo el dataset, aqui debe poner  SU RUTA
 dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
@@ -186,13 +188,14 @@ dtrain  <- dataset[ foto_mes==202101, ]
 
 #creo la carpeta donde va el experimento
 # HT  representa  Hiperparameter Tuning
-dir.create( "./exp/",  showWarnings = FALSE ) 
-dir.create( "./exp/HT4111/", showWarnings = FALSE )
-setwd("./exp/HT4111/")   #Establezco el Working Directory DEL EXPERIMENTO
+setwd("/Users/dfontenla/Maestria/2022C2/DMEyF/repo")   #Establezco el Working Directory DEL EXPERIMENTO
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB/",  showWarnings = TRUE ) 
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB/test/", showWarnings = TRUE )
+setwd("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB/test/")   #Establezco el Working Directory DEL EXPERIMENTO
 
 #defino los archivos donde guardo los resultados de la Bayesian Optimization
-archivo_log  <- "HT4111.txt"
-archivo_BO   <- "HT4111.RDATA"
+archivo_log  <- "bosample.txt"
+archivo_BO   <- "bosample.RDATA"
 
 #leo si ya existe el log, para retomar en caso que se se corte el programa
 GLOBAL_iteracion  <- 0
@@ -235,4 +238,3 @@ if( !file.exists( archivo_BO ) ) {
                control= ctrl)
 
 } else  run  <- mboContinue( archivo_BO )   #retomo en caso que ya exista
-

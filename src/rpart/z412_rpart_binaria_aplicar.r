@@ -6,12 +6,13 @@ require("data.table")
 require("rpart")
 require("rpart.plot")
 
+ksemilla_azar  <- c(864379, 300647, 125707, 962303, 983363)
 
 #Aqui se debe poner la carpeta de la materia de SU computadora local
-setwd("D:\\gdrive\\UBA2022\\")  #Establezco el Working Directory
+setwd("./")  #Establezco el Working Directory
 
 #cargo el dataset
-dataset  <- fread("./datasets/competencia1_2022.csv" )
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 
 
 #creo la clase_binaria SI={ BAJA+1, BAJA+2 }    NO={ CONTINUA }
@@ -30,34 +31,15 @@ dapply  <- dataset[ foto_mes==202103 ]  #defino donde voy a aplicar el modelo
 modelo  <- rpart(formula=   "clase_binaria ~ . -clase_ternaria",
                  data=      dtrain,  #los datos donde voy a entrenar
                  xval=         0,
-                 cp=          -0.54,#  -0.89
-                 minsplit=  1073,   # 621
-                 minbucket=  278,   # 309
-                 maxdepth=     9 )  #  12
+                 cp=          -1,#  -0.89
+                 minsplit=  745,   # 621
+                 minbucket=  105,   # 309
+                 maxdepth=     19 )  #  12
 
 
 #----------------------------------------------------------------------------
 # habilitar esta seccion si el Fiscal General  Alejandro Bolaños  lo autoriza
 #----------------------------------------------------------------------------
-
-# corrijo manualmente el drifting de  Visa_fultimo_cierre
-# dapply[ Visa_fultimo_cierre== 1, Visa_fultimo_cierre :=  4 ]
-# dapply[ Visa_fultimo_cierre== 7, Visa_fultimo_cierre := 11 ]
-# dapply[ Visa_fultimo_cierre==21, Visa_fultimo_cierre := 25 ]
-# dapply[ Visa_fultimo_cierre==14, Visa_fultimo_cierre := 18 ]
-# dapply[ Visa_fultimo_cierre==28, Visa_fultimo_cierre := 32 ]
-# dapply[ Visa_fultimo_cierre==35, Visa_fultimo_cierre := 39 ]
-# dapply[ Visa_fultimo_cierre> 39, Visa_fultimo_cierre := Visa_fultimo_cierre + 4 ]
-
-# corrijo manualmente el drifting de  Visa_fultimo_cierre
-# dapply[ Master_fultimo_cierre== 1, Master_fultimo_cierre :=  4 ]
-# dapply[ Master_fultimo_cierre== 7, Master_fultimo_cierre := 11 ]
-# dapply[ Master_fultimo_cierre==21, Master_fultimo_cierre := 25 ]
-# dapply[ Master_fultimo_cierre==14, Master_fultimo_cierre := 18 ]
-# dapply[ Master_fultimo_cierre==28, Master_fultimo_cierre := 32 ]
-# dapply[ Master_fultimo_cierre==35, Master_fultimo_cierre := 39 ]
-# dapply[ Master_fultimo_cierre> 39, Master_fultimo_cierre := Master_fultimo_cierre + 4 ]
-
 
 #aplico el modelo a los datos nuevos
 prediccion  <- predict( object=  modelo,
@@ -74,7 +56,7 @@ dfinal[ , prob_SI := prediccion[ , "SI"] ]
 
 # por favor cambiar por una semilla propia
 # que sino el Fiscal General va a impugnar la prediccion
-set.seed(102191)  
+set.seed(864379)  
 dfinal[ , azar := runif( nrow(dapply) ) ]
 
 # ordeno en forma descentente, y cuando coincide la probabilidad, al azar
@@ -84,6 +66,8 @@ setorder( dfinal, -prob_SI, azar )
 dir.create( "./exp/" )
 dir.create( "./exp/KA4120" )
 
+
+dfinal[1:5]
 
 for( corte  in  c( 7500, 8000, 8500, 9000, 9500, 10000, 10500, 11000 ) )
 {
@@ -96,3 +80,6 @@ for( corte  in  c( 7500, 8000, 8500, 9000, 9500, 10000, 10500, 11000 ) )
            file= paste0( "./exp/KA4120/KA4120_005_",  corte, ".csv"),
            sep=  "," )
 }
+
+dfinal[prob_SI > 0.025, Predicted := 1L]
+dfinal[Predicted==1]

@@ -19,12 +19,13 @@ require("ggplot2")
 require("dplyr")
 
 # Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
+#semillas <- c(17, 19, 23, 29, 31)
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
 # Cargamos el dataset
-dataset <- fread("./datasets/competencia1_2022.csv")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 
 # Nos quedamos solo con el 202101
 dataset <- dataset[foto_mes == 202101]
@@ -179,6 +180,17 @@ experimento <- function() {
         train  <-  dataset[in_training, ]
         test   <-  dataset[-in_training, ]
 
+
+        mean_Visa_fechaalta <- mean(train$Visa_fechaalta, na.rm = T)
+        # Imputamos los nulos de nuestra variable con la media
+        train[, Visa_fechaalta_3 := ifelse(is.na(Visa_fechaalta), 
+                    mean_Visa_fechaalta,
+                    Visa_fechaalta)] 
+
+        test[, Visa_fechaalta_3 := ifelse(is.na(Visa_fechaalta), 
+                    mean_Visa_fechaalta,
+                    Visa_fechaalta)] 
+
         r <- rpart(clase_binaria ~ .,
                     data = train,
                     xval = 0,
@@ -186,11 +198,14 @@ experimento <- function() {
                     minsplit = 20,
                     minbucket = 10,
                     maxdepth = 5)
-
+        
         gan <- c(gan, calcular_ganancia(r, test))
     }
     mean(gan)
 }
+
+experimento()
+
 
 # Veamos la 
 ## Preguntas

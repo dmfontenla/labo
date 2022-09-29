@@ -21,6 +21,7 @@ require("lightgbm")
 #paquetes necesarios para la Bayesian Optimization
 require("DiceKriging")
 require("mlrMBO")
+source("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/labo/src/my_scripts/competition2/feature_engineering.r")
 
 options(error = function() { 
   traceback(20); 
@@ -32,11 +33,13 @@ options(error = function() {
 
 #Aqui se cargan los hiperparametros
 hs <- makeParamSet( 
-         makeNumericParam("learning_rate",    lower=    0.005, upper=    0.3),
-         makeNumericParam("feature_fraction", lower=    0.2  , upper=    1.0),
-         makeIntegerParam("min_data_in_leaf", lower=    0L   , upper=  8000L), #min desde 500
-         makeIntegerParam("num_leaves",       lower=   16L   , upper=  1024L),
-         makeIntegerParam("envios",           lower= 5000L   , upper= 15000L)
+         makeNumericParam("learning_rate",    lower=    0.02, upper=    0.1),
+         makeNumericParam("feature_fraction", lower=    0.3  , upper=    0.8),
+         makeIntegerParam("min_data_in_leaf", lower=    100L   , upper=  6000L),
+         makeIntegerParam("num_leaves",       lower=   100   , upper=  700),
+         makeIntegerParam("envios",           lower= 5000L   , upper= 15000L),
+         makeNumericParam("bagging_fraction", lower=    0.3  , upper=    0.8) # % de registros a considerar en cada árbol
+
         )
 
 #defino los parametros de la corrida, en una lista, la variable global  PARAM
@@ -49,14 +52,14 @@ PARAM$input$dataset       <- "./datasets/competencia2_2022.csv.gz"
 PARAM$input$training      <- c( 202103 )
 
 PARAM$trainingstrategy$undersampling  <-  1.0   # un undersampling de 0.1  toma solo el 10% de los CONTINUA
-PARAM$trainingstrategy$semilla_azar   <- 102191  #Aqui poner la propia semilla
+PARAM$trainingstrategy$semilla_azar   <- 864379  #Aqui poner la propia semilla
 
-PARAM$hyperparametertuning$iteraciones <- 100
+PARAM$hyperparametertuning$iteraciones <- 250
 PARAM$hyperparametertuning$xval_folds  <- 5
 PARAM$hyperparametertuning$POS_ganancia  <- 78000
 PARAM$hyperparametertuning$NEG_ganancia  <- -2000
 
-PARAM$hyperparametertuning$semilla_azar  <- 102191  #Aqui poner la propia semilla, PUEDE ser distinta a la de trainingstrategy
+PARAM$hyperparametertuning$semilla_azar  <- 864379  #Aqui poner la propia semilla, PUEDE ser distinta a la de trainingstrategy
 
 #------------------------------------------------------------------------------
 #graba a un archivo los componentes de lista
@@ -126,12 +129,13 @@ EstimarGanancia_lightgbm  <- function( x )
                           verbosity= -100,
                           max_depth=  -1,         # -1 significa no limitar,  por ahora lo dejo fijo
                           min_gain_to_split= 0.0, #por ahora, lo dejo fijo
-                          lambda_l1= 0.0,         #por ahora, lo dejo fijo
+                          #lambda_l1= 0.0,         #por ahora, lo dejo fijo
                           lambda_l2= 0.0,         #por ahora, lo dejo fijo
                           max_bin= 31,            #por ahora, lo dejo fijo
                           num_iterations= 9999,   #un numero muy grande, lo limita early_stopping_rounds
                           force_row_wise= TRUE,   #para que los alumnos no se atemoricen con tantos warning
-                          seed= PARAM$hyperparametertuning$semilla_azar
+                          seed= PARAM$hyperparametertuning$semilla_azar,
+                          n_estimators=3000
                         )
 
   #el parametro discolo, que depende de otro
@@ -189,20 +193,27 @@ EstimarGanancia_lightgbm  <- function( x )
 #Aqui empieza el programa
 
 #Aqui se debe poner la carpeta de la computadora local
-setwd("~/buckets/b1/")   #Establezco el Working Directory
+setwd("./")   #Establezco el Working Directory
 
 #cargo el dataset donde voy a entrenar el modelo
-dataset  <- fread( PARAM$input$dataset )
+#dataset  <- fread( PARAM$input$dataset )
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia2_2022.csv")
+
 
 #creo la carpeta donde va el experimento
 # HT  representa  Hiperparameter Tuning
-dir.create( "./exp/",  showWarnings = FALSE ) 
-dir.create( paste0( "./exp/", PARAM$experimento, "/"), showWarnings = FALSE )
-setwd( paste0( "./exp/", PARAM$experimento, "/") )   #Establezco el Working Directory DEL EXPERIMENTO
+PARAM$experimento
+#dir.create( "./exp/" ) 
+#3dir.create( paste0( "./exp/", PARAM$experimento, "/") )
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB_LGBM_G/",  showWarnings = TRUE ) 
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB_LGBM_G/test/", showWarnings = TRUE )
+setwd("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/OB_LGBM_G/test/")   #Establezco el Working Directory DEL EXPERIMENTO
+
+#setwd( paste0( "./exp/", PARAM$experimento, "/") )   #Establezco el Working Directory DEL EXPERIMENTO
 
 #en estos archivos quedan los resultados
-kbayesiana  <- paste0( PARAM$experimento, ".RDATA" )
-klog        <- paste0( PARAM$experimento, ".txt" )
+kbayesiana  <- paste0( PARAM$experimento,format(Sys.time(), "%Y%m%d %H%M%S"), ".RDATA" )
+klog        <- paste0( PARAM$experimento,format(Sys.time(), "%Y%m%d %H%M%S"), ".txt" )
 
 
 GLOBAL_iteracion  <- 0   #inicializo la variable global
@@ -232,8 +243,16 @@ dataset[ foto_mes %in% PARAM$input$training &
           ( azar <= PARAM$trainingstrategy$undersampling | clase_ternaria %in% c( "BAJA+1", "BAJA+2" ) ),
          training := 1L ]
 
+marzo <- dataset[ training == 1L, campos_buenos, with=FALSE]
+marzo <- do_feature_engineering(marzo)
+
+marzo[ , mcuentas_saldo := NULL ]
+marzo[ , Master_mfinanciacion_limite := NULL ]
+marzo[ , Master_Finiciomora := NULL ]
+marzo[ , Master_fultimo_cierre := NULL ]
+
 #dejo los datos en el formato que necesita LightGBM
-dtrain  <- lgb.Dataset( data= data.matrix(  dataset[ training == 1L, campos_buenos, with=FALSE]),
+dtrain  <- lgb.Dataset( data= data.matrix( marzo ),
                         label= dataset[ training == 1L, clase01 ],
                         weight=  dataset[ training == 1L, ifelse( clase_ternaria=="BAJA+2", 1.0000002, ifelse( clase_ternaria=="BAJA+1",  1.0000001, 1.0) )],
                         free_raw_data= FALSE  )
@@ -272,3 +291,29 @@ if( !file.exists( kbayesiana ) ) {
 
 quit( save="no" )
 
+
+
+campos_modelo  <- names( modelo$variable.importance )
+campos_buenos  <- c( campos_modelo,  setdiff( colnames(dataset), campos_modelo ) )
+campos_buenos  <-  setdiff(  campos_buenos,  c( "foto_mes","clase_ternaria","clase_binaria" ) )
+
+
+dir.create( "./exp/",  showWarnings = TRUE ) 
+dir.create( "./exp/DR6130/", showWarnings = TRUE )
+setwd("./exp/DR6130/")
+
+
+pdf("densidades_01_03.pdf")
+for( campo in  campos_buenos )
+{
+  cat( campo, "  " )
+  graficar_campo( campo)
+
+  #graficar_campo( campo, "clase_ternaria", c( "BAJA+1", "BAJA+2", "CONTINUA" ) )
+  #graficar_campo( campo, "clase_ternaria", c( "BAJA+1", "BAJA+2" ) )
+  #graficar_campo( campo, "clase_ternaria", c( "BAJA+2" ) )
+  #graficar_campo( campo, "clase_ternaria", c( "BAJA+1" ) )
+  #graficar_campo( campo, "clase_ternaria", c( "CONTINUA" ) )
+}
+
+dev.off()

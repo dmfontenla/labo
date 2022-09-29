@@ -1,16 +1,24 @@
 #Arbol elemental con libreria  rpart
 #Debe tener instaladas las librerias  data.table  ,  rpart  y  rpart.plot
 
+
+#install.packages( "data.table", dependencies= TRUE )
+#install.packages( "rpart", dependencies= TRUE )
+#install.packages( "rpart.plot", dependencies= TRUE )
+
+rm(list = ls())
+gc(verbose = FALSE)
+
 #cargo las librerias que necesito
 require("data.table")
 require("rpart")
 require("rpart.plot")
 
 #Aqui se debe poner la carpeta de la materia de SU computadora local
-setwd("D:\\gdrive\\UBA2022\\")  #Establezco el Working Directory
+setwd("./")  #Establezco el Working Directory
 
 #cargo el dataset
-dataset  <- fread("./datasets/competencia1_2022.csv")
+dataset  <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 
 dtrain  <- dataset[ foto_mes==202101 ]  #defino donde voy a entrenar
 dapply  <- dataset[ foto_mes==202103 ]  #defino donde voy a aplicar el modelo
@@ -19,14 +27,24 @@ dapply  <- dataset[ foto_mes==202103 ]  #defino donde voy a aplicar el modelo
 modelo  <- rpart(formula=   "clase_ternaria ~ .",  #quiero predecir clase_ternaria a partir de el resto de las variables
                  data=      dtrain,  #los datos donde voy a entrenar
                  xval=      0,
-                 cp=       -0.3,   #esto significa no limitar la complejidad de los splits
-                 minsplit=  0,     #minima cantidad de registros para que se haga el split
-                 minbucket= 1,     #tamaño minimo de una hoja
-                 maxdepth=  4 )    #profundidad maxima del arbol
+                 cp=       -1,   #esto significa no limitar la complejidad de los splits
+                 minsplit=  700,     #minima cantidad de registros para que se haga el split
+                 minbucket= 233,     #tamaño minimo de una hoja
+                 maxdepth=  15 )    #profundidad maxima del arbol
 
 
 #grafico el arbol
 prp(modelo, extra=101, digits=5, branch=1, type=4, varlen=0, faclen=0)
+
+
+# Armamos una función que nos calcule la ganancia, usando el punto de corte de
+# 0.025
+ganancia <- function(probabilidades, clase) {
+  return(sum(
+    (probabilidades >= 0.025) * ifelse(clase == "evento", 78000, -2000))
+  )
+}
+
 
 
 #aplico el modelo a los datos nuevos
@@ -45,9 +63,9 @@ dapply[ , Predicted := as.numeric( prob_baja2 > 1/40 ) ]
 
 #genero el archivo para Kaggle
 #primero creo la carpeta donde va el experimento
-dir.create( "./exp/" )
-dir.create( "./exp/KA2001" )
+#dir.create( "./exp/" )
+#dir.create( "./exp/KA2001" )
 
 fwrite( dapply[ , list(numero_de_cliente, Predicted) ], #solo los campos para Kaggle
-        file= "./exp/KA2001/K101_001.csv",
+        file= paste("./exp/KA2001/K101_001.csv", Sys.time()),
         sep=  "," )

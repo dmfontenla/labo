@@ -33,10 +33,20 @@
 ## ---------------------------
 ## Step 2: Primer RF
 ## ---------------------------
+system('defaults write org.R-project.R force.LANG en_US.UTF-8')
+install.packages("randomForest", repo="http://cran.r-project.org", dep=T)
+library(randomForest)
 
 # Limpiamos el entorno
 rm(list = ls())
 gc(verbose = FALSE)
+system('defaults write org.R-project.R force.LANG en_US.UTF-8')
+
+install.packages("na.tools")
+require("na.tools")
+install.packages("na.roughfix")
+require("na.roughfix")
+install.packages("na.tools")
 
 # Librerías necesarias
 require("data.table")
@@ -45,14 +55,20 @@ require("ggplot2")
 require("ranger")
 require("randomForest")
 require("lightgbm")
+install.packages("roughfix")
+require("na.roughfix")
+install.packages("ranger")
+require("ranger")
+install.packages("lightgbm")
+require("lightgbm")
 
-# Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
-# Cargamos los datasets y nos quedamos solo con 202101 y 202103
-dataset <- fread("./datasets/competencia2_2022.csv.gz")
+# Cargamos el dataset
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia2_2022.csv")
+
 enero <- dataset[foto_mes == 202101]
 marzo <- dataset[foto_mes == 202103]
 
@@ -69,12 +85,14 @@ in_training <- caret::createDataPartition(enero$clase_binaria1,
 dtrain  <-  enero[in_training, ]
 dtest   <-  enero[-in_training, ]
 
+
 # ranger no soporta, como lo hacen otras librerías, los missing values
 dtrain <-  na.roughfix(dtrain)
 dtest <-  na.roughfix(dtest)
 
 # Cantidad de variables que abren por cada hoja
 n_variables <- round(sqrt(dim(dtrain)[2] - 1))
+
 
 t0 <- Sys.time()
 modelo_rf_1 <- ranger(clase_binaria1 ~ ., data = dtrain,
@@ -118,6 +136,7 @@ importancia <- as.data.table(modelo_rf_1$variable.importance,
 colnames(importancia) <- c("variable", "importancia")
 setorder(importancia, -importancia)
 importancia
+
 
 ## Preguntas
 ## - ¿Qué significa que una variable sea más importante que otra?
@@ -196,13 +215,14 @@ which(importancia3$variable == "pollito")
 ## ---------------------------
 
 # Cargamos todo para tener un código limpio
-dataset <- fread("./datasets/competencia2_2022.csv.gz")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia2_2022.csv")
 enero <- dataset[foto_mes == 202101]
 marzo <- dataset[foto_mes == 202103]
 rm(dataset)
 
 clase_binaria <- ifelse(enero$clase_ternaria == "BAJA+2", 1, 0)
 enero$clase_ternaria <- NULL
+
 
 dtrain  <- lgb.Dataset(data = data.matrix(enero), label = clase_binaria)
 

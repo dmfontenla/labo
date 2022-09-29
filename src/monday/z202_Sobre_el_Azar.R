@@ -1,6 +1,6 @@
 ##
 ## Sobre el Azar
-##
+## semillas <- c(864379, 300647, 125707, 962303, 983363)
 ## ---------------------------
 ## Step 1: El simple y viejo Train / Test
 ## ---------------------------
@@ -13,6 +13,10 @@
 rm(list = ls())
 gc(verbose = FALSE)
 
+install.packages( "data.table", dependencies= TRUE )
+install.packages( "rpart", dependencies= TRUE )
+install.packages( "rpart.plot", dependencies= TRUE )
+
 # Librerías necesarias
 require("data.table")
 require("rpart")
@@ -21,12 +25,13 @@ require("ggplot2")
 
 
 # Poner la carpeta de la materia de SU computadora local
-setwd("/home/aleb/dmeyf2022")
+setwd("./")
 # Poner sus semillas
-semillas <- c(17, 19, 23, 29, 31)
+#semillas <- c(17, 19, 23, 29, 31)
+semillas <- c(864379, 300647, 125707, 962303, 983363)
 
 # Cargamos el dataset
-dataset <- fread("./datasets/competencia1_2022.csv")
+dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
 
 # Nos quedamos solo con el 202101
 dataset <- dataset[foto_mes == 202101]
@@ -110,7 +115,7 @@ resultados_n_gan <- c()
 
 # Calcule en función del tiempo de ejecución anterior, cuantos árboles puede
 # hacer en 5 minutos y ponga ese número en la siguiente variable
-n <- 100
+n <- 50
 
 set.seed(semillas[1])
 t0 <- Sys.time()
@@ -249,48 +254,55 @@ resultados_grid_search <- data.table()
 # Complete los valores que se van a combinar para cada parámetro a explorar
 
 for (cp in c(-1, 0.01)) {
-for (md in c(5, 10)) {
-for (ms in c(1, 50)) {
-for (mb in c(1, as.integer(ms / 2))) {
+    for (md in c(5, 10,15,20,25)) {
+        for (ms in c(500,1000,2000,4000,8000)) {
+            for (mb in c(1, as.integer(ms / 2), as.integer(ms / 3))) {
 
-    t0 <- Sys.time()
-    gan_semillas <- c()
-    for (s in semillas) {
-        set.seed(s)
-        in_training <- caret::createDataPartition(dataset[,
-                        get("clase_binaria")],
-                                p = 0.70, list = FALSE)
-        dtrain  <-  dataset[in_training, ]
-        dtest   <-  dataset[-in_training, ]
+                t0 <- Sys.time()
+                gan_semillas <- c()
+                for (s in semillas) {
+                    set.seed(s)
+                    in_training <- caret::createDataPartition(dataset[,
+                                    get("clase_binaria")],
+                                            p = 0.70, list = FALSE)
+                    dtrain  <-  dataset[in_training, ]
+                    dtest   <-  dataset[-in_training, ]
 
-        modelo <- rpart(clase_binaria ~ .,
-                        data = dtrain,
-                        xval = 0,
-                        cp = cp,
-                        minsplit = ms,
-                        minbucket = mb,
-                        maxdepth = md)
-
-        pred_testing <- predict(modelo, dtest, type = "prob")
-        gan <- ganancia(pred_testing[, "evento"], dtest$clase_binaria) / 0.3
-
-        gan_semillas <- c(gan_semillas, gan)
-    }
-    tiempo <-  as.numeric(Sys.time() - t0, units = "secs")
-
-    resultados_grid_search <- rbindlist(list(
-                                resultados_grid_search,
-                                data.table(
-                                    tiempo = tiempo,
+                    modelo <- rpart(clase_binaria ~ .,
+                                    data = dtrain,
+                                    xval = 0,
                                     cp = cp,
-                                    mb = mb,
-                                    ms = ms,
-                                    md = md,
-                                    gan = mean(gan_semillas))
-                                ))
-}
-}
-}
+                                    minsplit = ms,
+                                    minbucket = mb,
+                                    maxdepth = md)
+
+                    pred_testing <- predict(modelo, dtest, type = "prob")
+                    gan <- ganancia(pred_testing[, "evento"], dtest$clase_binaria) / 0.3
+
+                    gan_semillas <- c(gan_semillas, gan)
+                }
+                tiempo <-  as.numeric(Sys.time() - t0, units = "secs")
+
+                resultados_grid_search <- rbindlist(list(
+                                            resultados_grid_search,
+                                            data.table(
+                                                tiempo = tiempo,
+                                                cp = cp,
+                                                mb = mb,
+                                                ms = ms,
+                                                md = md,
+                                                gan = mean(gan_semillas))
+                                            ))
+
+                print("params")
+                print(cp)
+                print(mb)
+                print(ms)
+                print(md)
+                print(gan)
+            }
+        }
+    }
 }
 
 # Visualizo los parámetros de los mejores parámetros
