@@ -11,7 +11,6 @@ gc()             #garbage collection
 
 require("data.table")
 require("lightgbm")
-source("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/labo/src/my_scripts/competition2/feature_engineering.r")
 
 
 #defino los parametros de la corrida, en una lista, la variable global  PARAM
@@ -24,13 +23,14 @@ PARAM$input$training      <- c( 202103 )
 PARAM$input$future        <- c( 202105 )
 
 PARAM$finalmodel$max_bin           <-     31
-PARAM$finalmodel$learning_rate     <-      0.0509728609400974   #0.0142501265
+PARAM$finalmodel$learning_rate     <-      0.0471928412518739   #0.0142501265
 PARAM$finalmodel$num_iterations    <-    118  #615
-PARAM$finalmodel$num_leaves        <-   287  #784
-PARAM$finalmodel$min_data_in_leaf  <-   1637  #5628
-PARAM$finalmodel$feature_fraction  <-      0.555250580140964  #0.8382482539
-PARAM$finalmodel$semilla           <- 864379
-PARAM$finalmodel$lambda_l1         <- 2.88922566228754
+PARAM$finalmodel$num_leaves        <-   581  #784
+PARAM$finalmodel$min_data_in_leaf  <-   1936  #5628
+PARAM$finalmodel$feature_fraction  <-      0.350976633415739  #0.8382482539
+PARAM$finalmodel$semilla           <- 125707
+PARAM$finalmodel$lambda_l1         <- 1.42085154674419
+PARAM$finalmodel$lambda_l2         <- 1.31192864891727
 
 
 
@@ -81,43 +81,10 @@ dir.create( "./exp/",  showWarnings = FALSE )
 dir.create( paste0("./exp/", PARAM$experimento, "/" ), showWarnings = FALSE )
 setwd( paste0("./exp/", PARAM$experimento, "/" ) )   #Establezco el Working Directory DEL EXPERIMENTO
 
-dataset[ train==1L]$clase01
-marzo <- dataset[ train==1L, campos_buenos, with=FALSE]
-marzo <- do_feature_engineering(marzo)
-dataset$clase01
-marzo$clase01
-
-install.packages("xgboost")
-require("xgboost")
-xgmarzo <- marzo
-xgmarzo$clase01
-
-dtrain_nf <- xgb.DMatrix(
-        data = data.matrix(xgmarzo),
-        label = dataset[ train==1L]$clase01, missing = NA)
-
-# Empecemos con algo muy básico
-param_fe <- list(
-            max_depth = 2,
-            eta = 0.1,
-            objective = "binary:logistic")
-nrounds <- 5
-
-xgb_model <- xgb.train(params = param_fe, data = dtrain_nf, nrounds = nrounds)
-
-## ---------------------------
-## Step 3: XGBoost, ... para generar nuevas variables
-## ---------------------------
-
-# https://research.facebook.com/publications/practical-lessons-from-predicting-clicks-on-ads-at-facebook/
-
-new_features <- xgb.create.features(model = xgb_model, data.matrix(xgmarzo))
-colnames(new_features)[150:173]
-summary(new_features)
 
 
 #dejo los datos en el formato que necesita LightGBM
-dtrain  <- lgb.Dataset( data= data.matrix( new_features ),
+dtrain  <- lgb.Dataset( data= data.matrix(  dataset[ train==1L, campos_buenos, with=FALSE]),
                         label= dataset[ train==1L, clase01] )
 
 #genero el modelo
@@ -131,8 +98,9 @@ modelo  <- lgb.train( data= dtrain,
                                    min_data_in_leaf=   PARAM$finalmodel$min_data_in_leaf,
                                    feature_fraction=   PARAM$finalmodel$feature_fraction,
                                    seed=               PARAM$finalmodel$semilla,
-                                   lambda_l1=          PARAM$finalmodel$lambda_l1 
-                                  )
+                                   lambda_l1=          PARAM$finalmodel$lambda_l1,
+                                   lambda_l2=          PARAM$finalmodel$lambda_l2
+                                   )
                     )
 
 #--------------------------------------

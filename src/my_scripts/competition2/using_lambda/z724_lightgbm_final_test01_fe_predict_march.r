@@ -17,21 +17,23 @@ source("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/labo/src/my_scripts/competit
 #defino los parametros de la corrida, en una lista, la variable global  PARAM
 #  muy pronto esto se leera desde un archivo formato .yaml
 PARAM <- list()
-PARAM$experimento  <- "KA7240"
+PARAM$experimento  <- "EXPERIMENTO"
 
 PARAM$input$dataset       <- "./datasets/competencia2_2022.csv.gz"
-PARAM$input$training      <- c( 202103 )
-PARAM$input$future        <- c( 202105 )
+PARAM$input$training      <- c( 202101 )
+PARAM$input$future        <- c( 202102 )
 
 PARAM$finalmodel$max_bin           <-     31
-PARAM$finalmodel$learning_rate     <-      0.0509728609400974   #0.0142501265
+PARAM$finalmodel$learning_rate     <-      0.0294380359079308   #0.0142501265
 PARAM$finalmodel$num_iterations    <-    118  #615
-PARAM$finalmodel$num_leaves        <-   287  #784
-PARAM$finalmodel$min_data_in_leaf  <-   1637  #5628
-PARAM$finalmodel$feature_fraction  <-      0.555250580140964  #0.8382482539
-PARAM$finalmodel$semilla           <- 864379
-PARAM$finalmodel$lambda_l1         <- 2.88922566228754
-
+PARAM$finalmodel$num_leaves        <-   131  #784
+PARAM$finalmodel$min_data_in_leaf  <-   1514  #5628
+PARAM$finalmodel$feature_fraction  <-      0.560365205364746  #0.8382482539
+PARAM$finalmodel$semilla           <- 125707
+PARAM$finalmodel$lambda_l1         <- 1.83313351307396
+#300647
+#125707
+#864379
 
 
 # hs <- makeParamSet( 
@@ -66,6 +68,9 @@ dataset[ , clase01 := ifelse( clase_ternaria %in%  c("BAJA+2","BAJA+1"), 1L, 0L)
 #los campos que se van a utilizar
 campos_buenos  <- setdiff( colnames(dataset), c("clase_ternaria","clase01") )
 
+campos_buenos_custom <- function(ds) {
+        return (setdiff( colnames(ds), c("clase_ternaria","clase01") ))
+}
 #--------------------------------------
 
 
@@ -81,43 +86,11 @@ dir.create( "./exp/",  showWarnings = FALSE )
 dir.create( paste0("./exp/", PARAM$experimento, "/" ), showWarnings = FALSE )
 setwd( paste0("./exp/", PARAM$experimento, "/" ) )   #Establezco el Working Directory DEL EXPERIMENTO
 
-dataset[ train==1L]$clase01
 marzo <- dataset[ train==1L, campos_buenos, with=FALSE]
 marzo <- do_feature_engineering(marzo)
-dataset$clase01
-marzo$clase01
-
-install.packages("xgboost")
-require("xgboost")
-xgmarzo <- marzo
-xgmarzo$clase01
-
-dtrain_nf <- xgb.DMatrix(
-        data = data.matrix(xgmarzo),
-        label = dataset[ train==1L]$clase01, missing = NA)
-
-# Empecemos con algo muy básico
-param_fe <- list(
-            max_depth = 2,
-            eta = 0.1,
-            objective = "binary:logistic")
-nrounds <- 5
-
-xgb_model <- xgb.train(params = param_fe, data = dtrain_nf, nrounds = nrounds)
-
-## ---------------------------
-## Step 3: XGBoost, ... para generar nuevas variables
-## ---------------------------
-
-# https://research.facebook.com/publications/practical-lessons-from-predicting-clicks-on-ads-at-facebook/
-
-new_features <- xgb.create.features(model = xgb_model, data.matrix(xgmarzo))
-colnames(new_features)[150:173]
-summary(new_features)
-
 
 #dejo los datos en el formato que necesita LightGBM
-dtrain  <- lgb.Dataset( data= data.matrix( new_features ),
+dtrain  <- lgb.Dataset( data= data.matrix( marzo ),
                         label= dataset[ train==1L, clase01] )
 
 #genero el modelo
@@ -149,14 +122,37 @@ fwrite( tb_importancia,
 
 #aplico el modelo a los datos sin clase
 dapply  <- dataset[ foto_mes== PARAM$input$future ]
+dapply <- do_feature_engineering(dapply)
+dapply$train = NULL
 
+dapply[ , clase01 := ifelse( clase_ternaria %in%  c("BAJA+2","BAJA+1"), 1L, 0L) ]
+
+colnames( dapply[, campos_buenos_custom(dapply), with=FALSE ])
+colnames(dtrain)
+
+
+colnames(dapply[ train==0L, campos_buenos, with=FALSE])
+
+dapply[, campos_buenos_custom(dapply)]
+modelo
+colnames(dtrain)
 #aplico el modelo a los datos nuevos
 prediccion  <- predict( modelo, 
-                        data.matrix( dapply[, campos_buenos, with=FALSE ])                                 )
+                        data.matrix( dapply[, campos_buenos_custom(dapply), with=FALSE ])                                 )
+
+
+sum((prediccion > 0.051) * ifelse(dapply$clase_ternaria == "BAJA+2", 78000, -2000))
+
+
+
+tb_entrega  <-  dapply[ , list( numero_de_cliente, foto_mes,clase_ternaria ) ]
+tb_entrega[  , prob := prediccion ]
+setorder( tb_entrega, -prob )
+
+tb_entrega
 
 #genero la tabla de entrega
-tb_entrega  <-  dapply[ , list( numero_de_cliente, foto_mes ) ]
-tb_entrega[  , prob := prediccion ]
+
 
 #grabo las probabilidad del modelo
 fwrite( tb_entrega,
@@ -169,15 +165,16 @@ setorder( tb_entrega, -prob )
 
 #genero archivos con los  "envios" mejores
 #deben subirse "inteligentemente" a Kaggle para no malgastar submits
-cortes <- seq( 5000, 12000, by=500 )
+cortes <- seq( 5000, 12000, by=250 )
 for( envios  in  cortes )
 {
   tb_entrega[  , Predicted := 0L ]
   tb_entrega[ 1:envios, Predicted := 1L ]
-
-  fwrite( tb_entrega[ , list(numero_de_cliente, Predicted)], 
-          file= paste0(  PARAM$experimento, "_", envios, ".csv" ),
-          sep= "," )
+  x = sum((tb_entrega$Predicted == 1) * ifelse(tb_entrega$clase_ternaria == "BAJA+2", 78000, -2000))
+  print(paste0("Corte:",envios," ganancia:",x)) 
+#   fwrite( tb_entrega[ , list(numero_de_cliente, Predicted)], 
+#           file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", envios, ".csv" ),
+#           sep= "," )
 }
 
 #--------------------------------------

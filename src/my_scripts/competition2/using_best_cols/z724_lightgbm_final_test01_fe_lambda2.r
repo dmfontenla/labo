@@ -17,22 +17,30 @@ source("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/labo/src/my_scripts/competit
 #defino los parametros de la corrida, en una lista, la variable global  PARAM
 #  muy pronto esto se leera desde un archivo formato .yaml
 PARAM <- list()
-PARAM$experimento  <- "KA7240"
+PARAM$experimento  <- "experimiento_lambda"
 
 PARAM$input$dataset       <- "./datasets/competencia2_2022.csv.gz"
 PARAM$input$training      <- c( 202103 )
 PARAM$input$future        <- c( 202105 )
 
 PARAM$finalmodel$max_bin           <-     31
-PARAM$finalmodel$learning_rate     <-      0.0509728609400974   #0.0142501265
+PARAM$finalmodel$learning_rate     <-      0.0653189880860748   #0.0142501265
 PARAM$finalmodel$num_iterations    <-    118  #615
-PARAM$finalmodel$num_leaves        <-   287  #784
-PARAM$finalmodel$min_data_in_leaf  <-   1637  #5628
-PARAM$finalmodel$feature_fraction  <-      0.555250580140964  #0.8382482539
-PARAM$finalmodel$semilla           <- 864379
-PARAM$finalmodel$lambda_l1         <- 2.88922566228754
+PARAM$finalmodel$num_leaves        <-   363  #784
+PARAM$finalmodel$min_data_in_leaf  <-   1335  #5628
+PARAM$finalmodel$feature_fraction  <-      0.397951270516677  #0.8382482539
+PARAM$finalmodel$semilla           <- 300647
+#PARAM$finalmodel$lambda_l1         <- 1.42085154674419
+PARAM$finalmodel$lambda_l2         <- 2.87113448933938
 
+#fecha	objective	metric	first_metric_only	boost_from_average	feature_pre_filter	verbosity	max_depth	min_gain_to_split	lambda_l1	max_bin	num_iterations	force_row_wise	seed	learning_rate	feature_fraction	min_data_in_leaf	num_leaves	envios	lambda_l2	ganancia	iteracion
+#20220929 095508	binary	custom	TRUE	TRUE	FALSE	-100	-1	0	0	31	99	TRUE	864379	0.0653189880860748	0.397951270516677	1335	363	9228	2.87113448933938	27870000	195
 
+#125707
+#300647
+#864379
+#fecha	objective	metric	first_metric_only	boost_from_average	feature_pre_filter	verbosity	max_depth	min_gain_to_split	max_bin	num_iterations	force_row_wise	seed	learning_rate	feature_fraction	min_data_in_leaf	num_leaves	envios	lambda_l1	lambda_l2	ganancia	iteracion
+# 20220929 120131	binary	custom	TRUE	TRUE	FALSE	-100	-1	0	31	315	TRUE	864379	0.0471928412518739	0.350976633415739	1936	581	8639	1.42085154674419	1.31192864891727	27850000	205
 
 # hs <- makeParamSet( 
 #          makeNumericParam("learning_rate",    lower=    0.005, upper=    0.3),
@@ -66,6 +74,9 @@ dataset[ , clase01 := ifelse( clase_ternaria %in%  c("BAJA+2","BAJA+1"), 1L, 0L)
 #los campos que se van a utilizar
 campos_buenos  <- setdiff( colnames(dataset), c("clase_ternaria","clase01") )
 
+campos_buenos_custom <- function(ds) {
+        return (setdiff( colnames(ds), c("clase_ternaria","clase01") ))
+}
 #--------------------------------------
 
 
@@ -77,47 +88,16 @@ dataset[ foto_mes %in% PARAM$input$training, train  := 1L ]
 #creo las carpetas donde van los resultados
 #creo la carpeta donde va el experimento
 # HT  representa  Hiperparameter Tuning
-dir.create( "./exp/",  showWarnings = FALSE ) 
-dir.create( paste0("./exp/", PARAM$experimento, "/" ), showWarnings = FALSE )
-setwd( paste0("./exp/", PARAM$experimento, "/" ) )   #Establezco el Working Directory DEL EXPERIMENTO
+date = format(Sys.time(), "%Y%m%d %H%M%S")
+dir.create( "/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/PRED_LGB/",  showWarnings = FALSE ) 
+dir.create( paste0("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/PRED_LGB/", PARAM$experimento,"_",date, "/" ), showWarnings = FALSE )
+setwd( paste0("/Users/dfontenla/Maestria/2022C2/DMEyF/repo/exp/PRED_LGB/", PARAM$experimento,"_",date, "/" ) )   #Establezco el Working Directory DEL EXPERIMENTO
 
-dataset[ train==1L]$clase01
 marzo <- dataset[ train==1L, campos_buenos, with=FALSE]
 marzo <- do_feature_engineering(marzo)
-dataset$clase01
-marzo$clase01
-
-install.packages("xgboost")
-require("xgboost")
-xgmarzo <- marzo
-xgmarzo$clase01
-
-dtrain_nf <- xgb.DMatrix(
-        data = data.matrix(xgmarzo),
-        label = dataset[ train==1L]$clase01, missing = NA)
-
-# Empecemos con algo muy básico
-param_fe <- list(
-            max_depth = 2,
-            eta = 0.1,
-            objective = "binary:logistic")
-nrounds <- 5
-
-xgb_model <- xgb.train(params = param_fe, data = dtrain_nf, nrounds = nrounds)
-
-## ---------------------------
-## Step 3: XGBoost, ... para generar nuevas variables
-## ---------------------------
-
-# https://research.facebook.com/publications/practical-lessons-from-predicting-clicks-on-ads-at-facebook/
-
-new_features <- xgb.create.features(model = xgb_model, data.matrix(xgmarzo))
-colnames(new_features)[150:173]
-summary(new_features)
-
 
 #dejo los datos en el formato que necesita LightGBM
-dtrain  <- lgb.Dataset( data= data.matrix( new_features ),
+dtrain  <- lgb.Dataset( data= data.matrix( marzo ),
                         label= dataset[ train==1L, clase01] )
 
 #genero el modelo
@@ -131,7 +111,8 @@ modelo  <- lgb.train( data= dtrain,
                                    min_data_in_leaf=   PARAM$finalmodel$min_data_in_leaf,
                                    feature_fraction=   PARAM$finalmodel$feature_fraction,
                                    seed=               PARAM$finalmodel$semilla,
-                                   lambda_l1=          PARAM$finalmodel$lambda_l1 
+                                   #lambda_l1=          PARAM$finalmodel$lambda_l1,
+                                   lambda_l2=          PARAM$finalmodel$lambda_l2
                                   )
                     )
 
@@ -145,14 +126,31 @@ fwrite( tb_importancia,
         sep= "\t" )
 
 #--------------------------------------
+mif = list(lgb.importance(modelo)$Feature[0:100])
+
+mif
 
 
 #aplico el modelo a los datos sin clase
 dapply  <- dataset[ foto_mes== PARAM$input$future ]
+dapply <- do_feature_engineering(dapply)
+dapply$train = NULL
+
+colnames(dapply[, campos_buenos, with=FALSE ])
+colnames(dtrain)
+names(dapply)
+#tb_importancia$Feature[0:100]
+dapply[mif]
+
+
+best_cols = c(tb_importancia$Feature[0:100])
+
+best_cols
+dapply[,..best_cols]
 
 #aplico el modelo a los datos nuevos
 prediccion  <- predict( modelo, 
-                        data.matrix( dapply[, campos_buenos, with=FALSE ])                                 )
+                        data.matrix( dapply[, campos_buenos_custom(dapply), with=FALSE ])                                 )
 
 #genero la tabla de entrega
 tb_entrega  <-  dapply[ , list( numero_de_cliente, foto_mes ) ]
@@ -169,14 +167,14 @@ setorder( tb_entrega, -prob )
 
 #genero archivos con los  "envios" mejores
 #deben subirse "inteligentemente" a Kaggle para no malgastar submits
-cortes <- seq( 5000, 12000, by=500 )
+cortes <- seq( 5000, 12000, by=250 )
 for( envios  in  cortes )
 {
   tb_entrega[  , Predicted := 0L ]
   tb_entrega[ 1:envios, Predicted := 1L ]
 
   fwrite( tb_entrega[ , list(numero_de_cliente, Predicted)], 
-          file= paste0(  PARAM$experimento, "_", envios, ".csv" ),
+          file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", envios, ".csv" ),
           sep= "," )
 }
 
