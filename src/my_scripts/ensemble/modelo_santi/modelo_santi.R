@@ -14,13 +14,15 @@ require("lightgbm")
 
 #Parametros del script
 PARAM  <- list()
-PARAM$experimento  <- "ZZ9410_lag2"
-PARAM$exp_input  <- "HT9410_lag2"
+PARAM$experimento  <- "ZZ_WFV_comb_3m_6m_hist6meses"
+PARAM$exp_input  <- "HT999_WFV_comb_3m_6m_hist6meses"
 
 PARAM$modelos  <- 2
 # FIN Parametros del script
 
-ksemilla  <- 864379
+ksemilla  <- 104701
+
+#------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 options(error = function() { 
@@ -29,6 +31,8 @@ options(error = function() {
   stop("exiting after script error") 
 })
 #------------------------------------------------------------------------------
+
+
 #------------------------------------------------------------------------------
 #Aqui empieza el programa
 
@@ -136,12 +140,27 @@ for( i in  1:PARAM$modelos )
           file= nom_pred,
           sep= "\t" )
 
-
   #genero los archivos para Kaggle
-  cortes  <- seq( from=  7000,
-                  to=   11000,
+  cortes  <- seq( from=  8000,
+                  to=   13000,
                   by=     500 )
 
+
+  setorder( tb_prediccion, -numero_de_cliente )
+
+  nom_submit  <- paste0( PARAM$experimento, 
+                    "_",
+                    sprintf( "%02d", i ),
+                    "_",
+                    sprintf( "%03d", iteracion_bayesiana ),
+                    "_",
+                    sprintf( "%05d", corte ),
+                    ".csv" )
+
+  tb_prediccion[  , Predicted := 1L ]
+  fwrite(  tb_prediccion[ , list( numero_de_cliente, Predicted ) ],
+        file= "modelo_santi_full_predictions",
+        sep= "," )
 
   setorder( tb_prediccion, -prob )
 
@@ -174,4 +193,3 @@ for( i in  1:PARAM$modelos )
   rm( dtrain )
   gc()
 }
-

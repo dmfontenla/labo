@@ -18,39 +18,30 @@ require("ranger")
 
 #Parametros del script
 PARAM <- list()
-PARAM$experimento  <- "CLU1262"
+PARAM$experimento  <- "CLU1261"
 # FIN Parametros del script
 
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
-setwd( "~/buckets/b1/" )  #cambiar por la carpeta local
+setwd( "~/buckets/b1/" ) 
 
 #leo el dataset original
 # pero podria leer cualquiera que tenga Feature Engineering
-dataset  <- fread( "./datasets/competencia3_2022.csv.gz", stringsAsFactors= TRUE)
+dataset <- fread( "/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia3_2022.csv.gz")
 
 #creo la carpeta donde va el experimento
 dir.create( paste0( "./exp/", PARAM$experimento, "/"), showWarnings = FALSE )
 setwd(paste0( "./exp/", PARAM$experimento, "/"))   #Establezco el Working Directory DEL EXPERIMENTO
 
+
 #me quedo SOLO con los BAJA+2
-dataset  <- dataset[  clase_ternaria =="BAJA+2"  & foto_mes>=202006  & foto_mes<=202105, ] 
+dataset  <- dataset[  clase_ternaria =="BAJA+2"  & foto_mes>=202006  & foto_mes<=202105, ]
 
-
-nrow(dataset)
-
-#armo el dataset de los 12 meses antes de la muerte de los registros que analizo
-dataset12  <- copy( dataset[  numero_de_cliente %in%  dataset[ , unique(numero_de_cliente)]  ]  )
-
-#asigno para cada registro cuantos meses faltan para morir
-setorderv( dataset12, c("numero_de_cliente", "foto_mes"), c(1,-1) )
-dataset12[  , pos := seq(.N) , numero_de_cliente ]
-
-#me quedo solo con los 12 meses antes de morir
-dataset12  <- dataset12[  pos <= 12 , ]
+fwrite( dataset, 
+          file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", "dataset_churn", ".csv" ),
+          sep= "," )
 gc()
-
 
 #quito los nulos para que se pueda ejecutar randomForest,  Dios que algoritmo prehistorico ...
 dataset  <- na.roughfix( dataset )
@@ -77,11 +68,9 @@ modelo  <- randomForest( x= dataset[  , campos_buenos, with=FALSE ],
                          proximity= TRUE, 
                          oob.prox=  TRUE )
 
-
 #genero los clusters jerarquicos
 hclust.rf  <- hclust( as.dist ( 1.0 - modelo$proximity),  #distancia = 1.0 - proximidad
                       method= "ward.D2" )
-
 
 
 #imprimo un pdf con la forma del cluster jerarquico
@@ -94,7 +83,7 @@ dev.off()
 h <- 20
 distintos <- 0
 
-while(  h>0  &  !( distintos >=6 & distintos <=7 ) )
+while(  h>0  &  !( distintos >=3 & distintos <=4 ) )
 {
   h <- h - 1 
   rf.cluster  <- cutree( hclust.rf, h)
@@ -126,15 +115,3 @@ dataset[  , mean(ctrx_quarter),  cluster2 ]  #media de la variable  ctrx_quarter
 dataset[  , mean(mtarjeta_visa_consumo),  cluster2 ]
 dataset[  , mean(mcuentas_saldo),  cluster2 ]
 dataset[  , mean(chomebanking_transacciones),  cluster2 ]
-
-
-#Finalmente grabo el archivo para  Juan Pablo Cadaveira
-#agrego a dataset12 el cluster2  y lo grabo
-
-dataset12[ dataset,
-           on= "numero_de_cliente",
-           cluster2 := i.cluster2 ]
-
-fwrite( dataset12, 
-        file= "cluster_de_bajas_12meses.txt",
-        sep= "\t" )

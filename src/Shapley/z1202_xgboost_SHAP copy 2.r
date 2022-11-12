@@ -33,20 +33,25 @@ setwd(paste0( "./exp/", PARAM$experimento, "/"))   #Establezco el Working Direct
 
 #agrego a mis fieles canaritos
 # nada temo porque Ellos son mis centinelas y delataran a los embusteros
-for( i in 1:20 )  dataset[ , paste0( "canarito", i ) := runif(nrow(dataset)) ]
+#for( i in 1:20 )  dataset[ , paste0( "canarito", i ) := runif(nrow(dataset)) ]
 
 #debo poner la clase en {0,1}
-dataset[ , clase01 := ifelse( clase_ternaria %in% c("BAJA+2"), 1, 0) ]
+dataset[ , clase01 := ifelse( clase_ternaria %in% c("CONTINUA"), 0, 1) ]
 
 
 col_buenas  <- setdiff(colnames(dataset) ,c("clase_ternaria","clase01") )
 
+
+col_buenas_filter  <- c("Visa_fechaalta","ccajas_consultas","ccaja_seguridad","mcuenta_corriente","Visa_msaldototal","internet","Visa_msaldopesos","Master_fechaalta","mactivos_margen","ccomisiones_mantenimiento","ccallcenter_transacciones","cproductos","mautoservicio","ccomisiones_otras","mtarjeta_master_consumo","mcuenta_debitos_automaticos","tmobile_app","thomebanking","mcomisiones","mcomisiones_otras","ctarjeta_master_transacciones","tcallcenter","chomebanking_transacciones","Visa_cconsumos","Master_Fvencimiento","Master_mpagominimo","Visa_mfinanciacion_limite","cmobile_app_trx","numero_de_cliente","mtransferencias_emitidas","ctarjeta_master","ctransferencias_recibidas","ccaja_ahorro","cliente_edad","Master_mfinanciacion_limite","Visa_mconsumototal","cliente_antiguedad","Visa_mconsumospesos","ccajas_transacciones","minversion2","Visa_Fvencimiento","Master_mlimitecompra","Master_cadelantosefectivo","Master_mpagospesos","mplazo_fijo_dolares","ccuenta_debitos_automaticos","Visa_mlimitecompra","Master_msaldototal","mpagomiscuentas","Visa_mconsumosdolares","tcuentas","Visa_mpagospesos","ctarjeta_debito","mttarjeta_visa_debitos_automaticos","cextraccion_autoservicio","Visa_mpagado","ctransferencias_emitidas","ctarjeta_visa_debitos_automaticos","mextraccion_autoservicio","mtransferencias_recibidas","matm","Master_madelantopesos","active_quarter","ccheques_depositados","ctarjeta_debito_transacciones","Master_msaldopesos","Master_mconsumospesos","cpagomiscuentas","catm_trx","mttarjeta_master_debitos_automaticos","Master_mconsumototal","Visa_delinquency","Master_mpagosdolares","Master_cconsumos","catm_trx_other","mcaja_ahorro_dolares","cforex_buy","matm_other","mcheques_emitidos","Visa_madelantopesos","Visa_cadelantosefectivo","Master_fultimo_cierre")
 
 #genero el dataset en el formato interno que necesita gradient voosting
 dtrain <- xgb.DMatrix( data=  as.matrix(dataset[ foto_mes==202103, col_buenas, with=FALSE]),
                        label= dataset[ foto_mes==202103, clase01 ]
                      )
 
+
+dtrain2 <- xgb.DMatrix( data=  as.matrix(dataset[ foto_mes==202103, col_buenas, with=FALSE]),
+                       label= dataset[ foto_mes==202103, clase01 ]
 
 #Entreno con hiperparametros que calcule en una Optimizacion Bayesiana PREVIA
 param_best <- list(nrounds= 265, max_leaves= 10, eta= 0.04, colsample_bytree= 0.43, gamma= 4.3)
@@ -66,7 +71,7 @@ modelo_final  <- xgboost(data= dtrain,
 
 #Calculo la importancia de variables  TRADICIONAL
 tb_importancia  <- xgboost::xgb.importance( model= modelo_final )
-
+as.list(tb_importancia[1:100]$Feature)
 
 dapply  <- dataset[ foto_mes==202105 ]
 
@@ -77,6 +82,8 @@ prediccion  <- predict( modelo_final,
 nrow( dapply )
 nrow( dapply[clase01 == "0"] )
 
+
+
 #valores Shapley de CADA registro
 # devuelve una matrix
 shap_values  <- shap.values(xgb_model = modelo_final, 
@@ -85,9 +92,15 @@ shap_values  <- shap.values(xgb_model = modelo_final,
 dtest <- dataset[ foto_mes==202103 ]
 
 shap_values_churn  <- shap.values(xgb_model = modelo_final, 
-                            X_train = as.matrix( dtest[clase01 == "1" , col_buenas, with=FALSE]))         
+                            X_train = as.matrix( dtest[clase01 == "1" , col_buenas_filter, with=FALSE]))         
 shap_values
 colnames(shap_values$shap_score)
+
+
+
+fwrite( dapply, 
+          file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", "dapply", ".csv" ),
+          sep= "," )
 
 fwrite( shap_values_churn$shap_score, 
           file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", "shap2", ".csv" ),
@@ -131,6 +144,8 @@ setorder( dt_mean2, -Shapley_abs )
 
 dt_mean2[   1:100]
 dt_mean2[ 100:175]
+
+
 
 
 pdf( "shap_xgb_00.pdf", width=20, height=10 )

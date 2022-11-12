@@ -1,0 +1,1082 @@
+---
+title: "TP 1: Regresión lineal"
+author: "Damian Fontenla"
+date: "16 de Octubre de 2022"
+output:
+  html_notebook:
+    theme: spacelab
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+## Diagnóstico y Evaluación de Modelos de Regresión Lineal
+
+### Dataset
+Los datos con los que se trabajará en este TP provienen de la 3° Encuesta Mundial de Salud Escolar (EMSE) provistos por el 
+Ministerio de Salud [link](http://datos.salud.gob.ar/dataset/base-de-datos-de-la-3-encuesta-mundial-de-salud-escolar-emse-con-resultados-nacionales-argentina) de la República Argentina. Esta encuesta trata sobre temas de salud y hábitos de las personas en la 
+escuela secundaria que pueden impactar en su salud. 
+
+
+```{r, warning=F, message=F}
+rm( list=ls() )  #remove all objects
+gc()       
+```
+
+
+```{r, warning=F, message=F}
+options(scipen=999)
+```
+
+```{r, warning=F, message=F}
+# Carga de librerías
+library(corrr)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(rsample)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(GGally)
+
+```
+
+Comenzamos leyendo los datos y viendo su estructura, para esto utilizamos la función glimpse
+```{r, warning=F, message=F}
+#Importamos los datasets con los que trabajaremos
+banking_churn = read.csv("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv", encoding = "UTF-8") %>% mutate(id = 1:nrow(.)) 
+
+```
+
+
+
+```{r, warning=F, message=F}
+january = banking_churn %>% filter(foto_mes == 202101)
+january = january %>% mutate(clase_ternaria = as.numeric(ifelse( clase_ternaria=="CONTINUA", 0, 1 ))) 
+```
+
+```{r, warning=F, message=F}
+january %>% glimpse()
+```
+
+```{r, warning=F, message=F}
+churn_january = banking_churn %>% filter(foto_mes == 202101, clase_ternaria != "CONTINUA")
+```
+
+```{r, warning=F, message=F}
+#Observamos la estructura y variables
+january %>% glimpse()
+```
+
+## Análisis exploratorios
+
+### Valores únicos y porcentaje de faltantes
+
+```{r, warning=F, message=F}
+
+tabla_exploratorios =  january %>%
+                                      gather(., 
+                                            key = "variables", 
+                                            value = "valores") %>% # agrupamos por las variables del set
+                                      group_by(variables) %>% 
+                                      summarise(valores_unicos = n_distinct(valores),
+                                      porcentaje_faltantes = sum(is.na(valores))/nrow(churn_january)*100) %>% 
+                                      arrange(desc(porcentaje_faltantes), valores_unicos) # ordenamos por porcentaje de faltantes y valores unicos
+tabla_exploratorios
+```
+
+
+### Análisis descriptivo
+
+Realizamos un primer análisis descriptivo de nuestro dataset de columnas relevantes. Para ello utilizamos la función ggpairs sobre las variables 
+numéricas con una apertura por la variable de sexo.
+```{r, warning=F, message=F}
+#Observamos la correlacion de variables
+#encuesta_salud_train_numeric = encuesta_salud_train %>% dplyr::select(where(is.numeric))
+
+# Seleccionamos las variables de interés
+january_filtered = january %>%
+                              dplyr::select(active_quarter,cliente_edad,cliente_antiguedad,mrentabilidad,mrentabilidad_annual,mcomisiones,mactivos_margen,mpasivos_margen,cproductos,tcuentas,
+                              mcuenta_corriente,mcaja_ahorro,mcuentas_saldo,ctarjeta_debito,ctarjeta_debito_transacciones,ctarjeta_visa,ctarjeta_visa_transacciones,mtarjeta_visa_consumo,
+                              ctarjeta_master,ctarjeta_master_transacciones,mtarjeta_master_consumo,cprestamos_personales,mprestamos_personales,cprestamos_prendarios,mprestamos_prendarios,
+                              cprestamos_hipotecarios,mprestamos_hipotecarios,cplazo_fijo,mplazo_fijo_pesos,cseguro_vida,cseguro_auto,cseguro_vivienda,cpayroll_trx,mpayroll,mpayroll2,
+                              ccuenta_debitos_automaticos,clase_ternaria)
+
+#encuesta_salud_train_gender_numeric %>% glimpse()
+
+#encuesta_salud_train_gender_numeric %>% ggpairs(aes(color=genero), upper = list(continuous = wrap("cor", size = 3, hjust=0.8, alignPercent=0.15)), legend = 25) + 
+#  theme_bw() +
+#  theme(axis.text.x = element_text(angle=45, vjust=0.5), legend.position = "bottom")
+```
+
+
+Realizamos el análisis solo numérico de la correlación entre variables
+```{r, warning=F, message=F}
+
+january_filtered %>% 
+ correlate() %>% # convierte la matriz de corr en dataframe
+  shave() %>% # solo muestra información debajo de la diagonal principal
+  fashion() # acomoda los datos en forma tidy (por ej. redondeo de decimales)
+```
+
+Lo graficamos para tener las relaciones de una forma mas descriptiva
+```{r, warning=F, message=F}
+january_filtered %>% 
+ correlate() %>% 
+  network_plot(min_cor = 0.6)
+```
+
+
+```{r, warning=F, message=F}
+
+january_filtered_numeric = january_filtered %>% select_if(is.numeric)
+```
+
+```{r, warning=F, message=F}
+january_filtered_numeric %>% glimpse()
+```
+
+
+```{r, warning=F, message=F}
+library(xgboost)
+install.packages("shapr")
+library(dplyr)
+library(shapr)
+```
+
+
+
+```{r, warning=F, message=F}
+colnames(january_filtered_numeric)
+paste(colnames(january_filtered_numeric), collapse = ", ")
+
+```
+
+
+
+
+```{r, warning=F, message=F}
+```
+
+
+```{r, warning=F, message=F}
+```
+
+
+```{r, warning=F, message=F}
+
+x_var <- c( "active_quarter", "cliente_edad", "cliente_antiguedad", "mrentabilidad", "mrentabilidad_annual", "mcomisiones", "mactivos_margen", "mpasivos_margen", "cproductos", "tcuentas", 
+"mcuenta_corriente", "mcaja_ahorro", "mcuentas_saldo", "ctarjeta_debito", "ctarjeta_debito_transacciones", "ctarjeta_visa","ctarjeta_visa_transacciones", "mtarjeta_visa_consumo", 
+"ctarjeta_master", "ctarjeta_master_transacciones", "mtarjeta_master_consumo", "cprestamos_personales", "mprestamos_personales", "cprestamos_prendarios", "mprestamos_prendarios", 
+"cprestamos_hipotecarios", "mprestamos_hipotecarios", "cplazo_fijo", "mplazo_fijo_pesos", "cseguro_vida", "cseguro_auto", "cseguro_vivienda", "cpayroll_trx", "mpayroll", 
+"mpayroll2", "ccuenta_debitos_automaticos")
+y_var <- "clase_ternaria"
+
+
+x_train <- as.matrix(january_filtered_numeric[-1:-6,x_var])
+y_train <- january_filtered_numeric[-1:-6, y_var]
+x_test <- as.matrix(january_filtered_numeric[1:6, x_var])
+
+model <- xgboost(
+  data = x_train,
+  label = y_train,
+  nround = 20,
+  verbose = FALSE
+)
+```
+
+
+
+```{r, warning=F, message=F}
+# Prepare the data for explanation
+explainer <- shapr(x_train, model)
+#> The specified model provides feature classes that are NA. The classes of data are taken as the truth.
+```
+
+```{r, warning=F, message=F}
+```
+
+
+```{r, warning=F, message=F}
+# Specifying the phi_0, i.e. the expected prediction without any features
+p <- mean(y_train)
+
+
+# Computing the actual Shapley values with kernelSHAP accounting for feature dependence using
+# the empirical (conditional) distribution approach with bandwidth parameter sigma = 0.1 (default)
+explanation <- explain(
+  x_test,
+  approach = "empirical",
+  explainer = explainer,
+  prediction_zero = p
+)
+```
+
+
+```{r, warning=F, message=F}
+# Printing the Shapley values for the test data.
+# For more information about the interpretation of the values in the table, see ?shapr::explain.
+print(explanation$dt)
+#>      none     lstat         rm       dis      indus
+#> 1: 22.446 5.2632030 -1.2526613 0.2920444  4.5528644
+#> 2: 22.446 0.1671903 -0.7088405 0.9689007  0.3786871
+#> 3: 22.446 5.9888016  5.5450861 0.5660136 -1.4304350
+#> 4: 22.446 8.2142203  0.7507569 0.1893368  1.8298305
+#> 5: 22.446 0.5059890  5.6875106 0.8432240  2.2471152
+#> 6: 22.446 1.9929674 -3.6001959 0.8601984  3.1510530
+```
+
+
+```{r, warning=F, message=F}
+# Plot the resulting explanations for observations 1 and 6
+plot(explanation, plot_phi0 = FALSE, index_x_test = c(1, 6))
+```
+
+
+
+
+
+
+
+Respecto a nuestra variable a predecir, **el peso**, observamos:
+
+- La variable altura es aquella que tiene mayor correlación con nuestra variable a predecir
+- Gráficamente también se puede observar la correlación entre altura y peso
+- Exceptuando la altura, el resto de las variables presentan una correlación muy baja 
+- En una primera observación no parecieramos tener en el dataset la presencia de outliers que nos pueda traer complicaciones en análisis posteriores
+- A pesar que existen diferencias, no observamos distribuciones significativamente diferentes según el género
+
+
+### Análisis frecuencia de hambre mensual
+
+Para las categorías de la variable frecuencia de hambre mensual, analice gráficamente la distribución en términos de frecuencia relativa de:
+
+* a) El consumo semanal de verdura.
+* b) El consumo semanal de comida grasa.
+
+
+Agrupamos los valores para obtener la frecuencia tanto de consumo semanal de verduras como de consumo semanal de comida grasa
+```{r, warning=F, message=F}
+
+#encuesta_salud_train_numeric <- data.frame(encuesta_salud_train)       
+
+consumo_verduras_freq = encuesta_salud_train %>%
+  group_by(frecuencia_hambre_mensual, consumo_semanal_verdura) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+consumo_verduras_freq %>% glimpse
+
+consumo_semanal_comida_grasa_freq = encuesta_salud_train %>%
+  group_by(frecuencia_hambre_mensual, consumo_semanal_comida_grasa) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+consumo_semanal_comida_grasa_freq %>% glimpse
+
+```
+
+#### Frecuencia de hambre mensual / consumo semanal de verduras
+
+```{r, warning=F, message=F}
+ggplot(data = consumo_verduras_freq, aes(x = frecuencia_hambre_mensual, y = freq, fill = consumo_semanal_verdura)) + 
+geom_bar(stat = "identity", position = position_dodge()) + 
+xlab("Frecuencia de hambre mensual") + 
+ylab("Consumo semanal de verduras") + 
+theme(axis.text.x = element_text(angle = 90)) + 
+coord_flip() + 
+theme_bw() + 
+labs(title = "Frecuencia de hambre mensual") +
+scale_fill_brewer(palette = "Paired") + 
+theme(axis.text.x = element_text(size = 10)) + 
+theme(axis.title.x = element_text(size = 15)) + 
+theme(axis.title.y = element_text(size = 15)) + 
+theme(plot.title = element_text(size = 20))
+
+```
+
+Se puede observar como para las categorias *Siempre* y *Casi siempre* de hambre mensual, aumenta de forma significativa la cantidad de valores en *consumo semanal verduras*, que hacen referencia a no 
+ingerir estos alimentos con recurrencia, y si aquellas que referencian a valores semanales (*1 a 3 veces durante los ultimos 7 dias* y *4 a 6 veces durante los ultimos siete dias*) 
+en lugar de valores diarios
+
+#### Frecuencia de hambre mensual / consumo semanal de comida grasa
+
+```{r, warning=F, message=F}
+ggplot(data = consumo_semanal_comida_grasa_freq, aes(x = frecuencia_hambre_mensual, y = freq, fill = consumo_semanal_comida_grasa)) + 
+geom_bar(stat = "identity", position = position_dodge()) + 
+xlab("Frecuencia de hambre mensual") + 
+ylab("Consumo de comida grasa") + 
+theme(axis.text.x = element_text(angle = 90)) + 
+coord_flip() + 
+theme_bw() + 
+labs(title = "Frecuencia de hambre mensual") +
+scale_fill_brewer(palette = "Paired") + 
+theme(axis.text.x = element_text(size = 10)) + 
+theme(axis.title.x = element_text(size = 15)) + 
+theme(axis.title.y = element_text(size = 15)) + 
+theme(plot.title = element_text(size = 20))
+
+```
+
+Por otro lado, en cuanto al análisis de la relación entre el consumo de comida grasa y la frecuencia de hambre, observamos que el consumo habitual de comidad grasa, 
+aumenta la frecuencia de hambre mensual. Buscando referencias a esta conclusión, existen estudios relacionados a la obecidad donde focalizan sobre esta relación donde
+los alimentos con altos contenidos grasos, dan más hambre
+
+<!-- 2) Modelo inicial
+Se plantea que una primera alternativa para modelar el peso es:
+E(peso) = β0 +β1altura+β2edad+β3genero+β4diasActividadF isicaSemanal+β5consumoDiarioAlcohol
+¿Cuál es la interpretación de cada uno de los coeficientes estimados? ¿Son significativos? ¿El modelo resulta
+significativo para explicar el peso? ¿Qué porcentaje de la variabilidad explica el modelo? -->
+
+## Modelo inicial
+
+### Creación del modelo
+Se plantea que una primera alternativa para modelar el peso es: 
+*E(peso) = β0 +β1altura+β2edad+β3genero+β4diasActividadF isicaSemanal+β5consumoDiarioAlcohol*
+
+Realizamos una selección de las variables de nuestro interés para poder realizar el modelado, y observamos su estructura
+```{r, warning=F, message=F}
+
+#encuesta_salud_train %>% glimpse
+encuesta_salud_modelo_base = encuesta_salud_train %>%
+                              # Seleccionamos las variables de interés
+                              dplyr::select(edad, genero, altura, peso,dias_actividad_fisica_semanal,consumo_diario_alcohol)
+```
+
+```{r, warning=F, message=F}
+encuesta_salud_modelo_base %>% glimpse
+```
+
+Vemos cómo es la correlación entre las variables numéricas.
+
+```{r, warning=F, message=F}
+
+encuesta_salud_modelo_base %>% ggpairs(aes(color=genero), upper = list(continuous = wrap("cor", size = 3, hjust=0.8, alignPercent=0.15)), legend = 25) + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45, vjust=0.5), legend.position = "bottom")
+
+```
+
+
+Armamos un modelo para predecir el *peso* en función de la *altura, edad, género, días de actividad física semanal y consumo diario de alcohol*. 
+
+*E(peso) = β0 +β1altura+β2edad+β3genero+β4diasActividadFisicaSemanal+β5consumoDiarioAlcohol*
+
+```{r, warning=F, message=F}
+# ajustamos modelo lineal múltiple
+modelo_ln_base <- lm(peso ~ edad + genero + altura + dias_actividad_fisica_semanal + consumo_diario_alcohol, data = encuesta_salud_modelo_base)
+# Resumen del modelo
+tidy_ln_base <- tidy(modelo_ln_base, conf.int = TRUE)
+tidy_ln_base
+```
+
+### Evaluación de coeficientes 
+
+#### Significado de los coeficientes estimados
+
+- El valor de β0^ (ordenada al origen) es -68.92 kg, lo que corresponde al peso esperado de una persona femenina sin edad, sin altura, sin dias de actividad fisica y 
+sin consumo diario en alcohol. Lo cual, este caso carecería de sentido ya que las personas femeninas deberían tener como valores de altura y edad numeros positivos > 0.
+
+- β0^ + βgeneroMasculino es la media del peso para las personas de género masculino, dada la edad, altura, dias de consumo de alcohol, dias de actividad fisica. 
+Por lo tanto, βgeneroMasculino es la diferencia en los niveles medios de pesos de las personas masculinas respecto de las femeninas (categoría basal).
+Es decir, βgeneroMasculino (1.262643558) indica cuánto más alta es la función de respuesta (peso) para las personas masculinas respecto de las femeninas (categoría basal), 
+dada la edad, altura, dias de consumo de alcohol y dias de actividad física.
+
+- El coeficiente estimado de edad es de 1.4kg, lo que indica que si mantenemos el número de altura, género, dias de actividad fisica y consumo diario de alchol, 
+cada incremento adicional de edad corresponde a un aumento de 1.4kg, en promedio en el peso de la persona femenina. O lo que es igual, dadas dos personas con la misma altura, 
+dias de actividad fisica, genero y consumo de alcohol, pero teniendo una un año más de edad que la otra, el peso esperado para la de mayor edad será 1.4kg más que la de menor pesaje.
+
+- El coeficiente estimado de altura es de 0.65kg, lo que indica que si mantenemos el número de género, edad, dias de actividad física y consumo diario de alchol, 
+cada incremento adicional de altura corresponde a un aumento de 0.65kg, en promedio en el peso de la persona femenina. O lo que es igual, dadas dos personas con la 
+misma edad, dias de actividad fisica, genero y consumo de alcohol, pero teniendo una un centímetro más de altura que la otra, el peso esperado para la de mayor altura será 0.65kg más que la de menor pesaje.
+
+- El coeficiente estimado de dias de actividad fisica es de -0.0874kg, lo que indica que si mantenemos el género, edad, altura y consumo diario de alchol, 
+cada incremento de un día de actividad fisica adicional corresponde a un decremento de 0.0874kg, en promedio en el peso de la persona femenina. O lo que es igual, dadas dos personas con la 
+misma edad, altura, género y consumo de alcohol, pero teniendo una un día de actividad fisica más que la otra, el peso esperado para la de mayor dias de actividad física será 0.0874kg menor que la de mayor pesaje.
+
+- El coeficiente estimado de dias de consumo de alcohol es de 0.00727kg, lo que indica que si mantenemos el número de género, edad, altura y días de actividad física, 
+cada incremento de un día de consumo de alcohol adicional corresponde a un aumento de 0.00727kg, en promedio en el peso de la persona femenina. O lo que es igual, dadas dos personas con la 
+misma edad, altura, género y días de actividad física, pero teniendo una un día de consumo de alcohol más que la otra, el peso esperado para la de mayor días de consumo de alcohol será 0.00727kg más que la de menor pesaje.
+
+### Significancia individual y global
+
+#### Inferencia de los βk (test de significatividad individual)
+
+Para evaluar la significatividad individual de cada una de las variables se analiza el test t que busca probar si el coeficiente de regresión correspondiente a dicha variable es distinto de 0 (figura en la tabla resumen de resultados de la regresión).
+
+Es decir, buscamos probar:
+
+*H0:βk=0*
+*H1:βk≠0.*
+
+```{r, warning=F, message=F}
+options("scipen"=1)
+tidy_ln_base %>% select(term, statistic, p.value, conf.low, conf.high)
+significancia = tidy_ln_base %>% dplyr::select(term, statistic, p.value, conf.low, conf.high)
+```
+
+```{r, warning=F, message=F}
+significancia
+```
+
+Evaluando la significancia de cada variable observamos lo siguiente
+
+Para las variables edad, altura, generoMasculino, generoFemenino (basal):
+
+- Las variables resultan estadísticamente significativas para explicar el peso de las personas (p-valores < 0.05).
+- Además del resultado del test, podemos corroborar que los intervalos de confianza del 95% para los coeficientes estimados no contienen al 0 en ninguno de los casos.
+
+Para las variables días de actividad física semanal y consumo diario de alcohol:
+
+- Las variables NO resultan estadísticamente significativas para explicar el peso de las personas (p-valores > 0.05).
+- Además del resultado del test, podemos corroborar que los intervalos de confianza del 95% para los coeficientes estimados contienen al 0 en los casos.
+
+```{r, warning=F, message=F}
+tidy(anova(modelo_ln_base))
+```
+
+La tabla de ANOVA muestra que, según el resultado del test F, la variable género en su conjunto, también resulta estadísticamente significativa para explicar al precio (p-valor < 0.05).
+
+#### Test F (test de significatividad global)
+
+Se construye para testear las hipótesis:
+
+H0:β1=β2=···=βp−1=0
+
+H1: no todos los βk (k=1,2,...,p−1) son iguales a 0.
+
+Observemos que H0 dice que no hay vínculo entre la variable respuesta y las regresoras. En cambio, H1 dice que al menos una de las variables regresoras sirve para predecir a Y.
+Los resultados de este test se pueden observar haciendo un summary() del modelo o glance().
+
+```{r, warning=F, message=F}
+glance(modelo_ln_base)
+```
+
+*F-statistic: 770.4 on 5 and 7018 DF,  p-value: < 2.2e-16* 
+
+**Test significativo** por lo que determinamos que se rechaza la hipotesis nula, nuestro modelo es relevante en comparación al modelo base, para determinar que arroja resultados significativos tomando la variable predictora
+
+El R-cuadrado permite medir el porcentaje de variabilidad del fenómeno que el modelo logra explicar. Por este motivo es una métrica que nos permite evaluar la capacidad explicativa 
+del modelo y poder comparar modelos entre sí bajo ciertas condiciones.
+
+En nuestro caso tenemos un valor de **Multiple R-squared: 0.3544**, **Adjusted R-squared: 0.3539** 
+
+<!-- 3) Modelo categóricas
+Se sugiere probar un modelo que incopore el consumo semanal de snacks y una interacción entre el género y
+la edad, en lugar de actividad física y consumo de alcohol:
+E(peso) = β0 + β1altura + β2edad + β3genero + β4consumoSemanalSnacks + β5genero · edad
+Además se pide explícitamente que la categoría “No comí comida salada o snacks en los últimos 7 días” de la
+variable consumoSemanalSnacks se encuentre como nivel/categoría basal.
+¿Cuál es la interpretación de los coeficientes estimados para las categorías de consumoSemanalSnacks y
+genero . edad? ¿Son significativas? ¿Qué porcentaje de la variabilidad explica el modelo?
+En caso de detectar que existen categorías no significativas de la variable consumoSemanalSnacks evaluar
+si la variable es significativa en su conjunto y, en caso afirmativo, proponer una redefinición de las mismas
+que permita obtener una mayor proporción de categorías significativas individualmente. Luego, analizar si
+existen cambios en la variabilidad explicada por el modelo. -->
+
+
+## Modelo categóricos
+
+### Creación modelo categórico
+
+#### Se sugiere probar un modelo que incopore el consumo semanal de snacks y una interacción entre el género y la edad, en lugar de actividad física y consumo de alcohol: 
+#### E(peso) = β0 + β1altura + β2edad + β3genero + β4consumoSemanalSnacks + β5genero · edad
+
+```{r, warning=F, message=F}
+
+encuesta_salud_train %>% glimpse
+
+encuesta_salud_second_model = encuesta_salud_train %>%
+                              # Seleccionamos las variables de interés
+                              dplyr::select(edad, genero, altura, peso,consumo_semanal_snacks)
+
+encuesta_salud_second_model %>% glimpse
+
+```
+
+Dejamos al valor *No comí comida salada o snacks en los últimos 7 días* de consumo semanal de snacks como categoría basal en una nueva variable que llamaremos **consumo_semanal_snacks_relevel**
+```{r, warning=F, message=F}
+encuesta_salud_second_model$consumo_semanal_snacks_relevel <- relevel(as.factor(encuesta_salud_second_model$consumo_semanal_snacks), ref = 8)
+```
+
+Graficámos la variable categórica *consumoSemanalSnacks* para analizar sus valores en función del peso
+```{r, warning=F, message=F}
+
+# armo boxplots paralelos consumo de snacks en función del peso
+ggplot( encuesta_salud_second_model, aes(x = fct_reorder(consumo_semanal_snacks_relevel, peso, .desc = T), y = peso)) + 
+  geom_boxplot(alpha = 0.75, aes(fill = consumo_semanal_snacks_relevel)) + 
+  theme_minimal() + 
+  theme(legend.position = 'none')+
+  labs(y = "Peso", x = "Consumo snacks")  +
+  ggtitle("Boxplots del peso en función del consumo de snacks")+
+  theme (axis.text.x = element_text(face="italic", colour="dark grey", size = 8, angle = 90))
+
+```
+
+```{r, warning=F, message=F}
+modelo_ln_2_r <- lm(peso ~ consumo_semanal_snacks_relevel + edad + genero + altura + (edad * genero), data = encuesta_salud_second_model)
+```
+
+```{r, warning=F, message=F}
+# Resumen del modelo
+tidy_ln_2_r <- tidy(modelo_ln_2_r, conf.int = TRUE)
+print(tidy_ln_2_r)
+```
+
+
+### Interpretación de coeficientes / Análisis de significancia
+
+Intercept
+
+- El valor de β0 (ordenada al origen) es -64.2 kg, lo que corresponde al peso esperado de una persona femenina, que no comió comida salada o snacks en los últimos 7 dias y contiene
+la suma del coeficiente *edad:generoFemenino* manteniendo el resto de las variables constantes. (Una variable de cada atributo categoróco forman parte del Intercept, en este caso 
+género *femenino*, aquella que redefinimos para que sea basal de consumo de snacks *No comió comida salada o snacks en los últimos 7 dias* y la nueva variable creada *edad:generoFemenino*)
+
+Coeficiente edad:generoMasculino:
+
+- El coeficiente estimado de edad:generoMasculino es de 0.391kg, lo que indica que si mantenemos el número de altura, genero, edad y consumo semanal de snacks, 
+cada incremento de una unidad para edad:generoMasculino corresponde a un aumento de 0.391kg, en promedio en el peso de la persona femenina. => **Significativa**
+
+Coeficiente del consumo semanal de snacks:
+
+- El coeficiente estimado de consumo semanal snacks 1 a 3 veces durante los últimos 7 días es de -1.35, si mantenemos el resto de las variables constantes, el incremento de una unidad para 
+consumo_semanal_snacks 1 a 3 veces durante los últimos 7 días, corresponde a una baja de 1.35kg, en promedio en el peso de la persona. => **Significativa**
+
+- El coeficiente estimado de consumo_semanal_snacks 1 vez al día es de -0.608, si mantenemos el resto de las variables constantes, el incremento de una unidad para 
+consumo_semanal_snacks 1 vez al día corresponde a una baja de 0.608, en promedio en el peso de la persona. **No significativa**
+
+- El coeficiente estimado de consumo_semanal_snacks 2 veces al día es de -1.09, si mantenemos el resto de las variables constantes, el incremento de una unidad para 
+consumo_semanal_snacks 2 veces al día corresponde a una baja de 1.09, en promedio en el peso de la persona. => **No significativa**
+
+- El coeficiente estimado de consumo_semanal_snacks 3 veces al día es de -1.28, si mantenemos el resto de las variables constantes, el incremento de una unidad para 
+consumo_semanal_snacks 3 veces al día corresponde a una baja de 1.28, en promedio en el peso de la persona. => **No significativa**
+
+- El coeficiente estimado de consumo_semanal_snacks 4 a 6 veces durante los últimos 7 días es de -2.27, si mantenemos el resto de las variables constantes, el incremento de una unidad para 
+consumo_semanal_snacks 4 a 6 veces durante los últimos 7 días corresponde a una baja de 2.27kg, en promedio en el peso de la persona. => **Significativa**
+
+- El coeficiente estimado de consumo_semanal_snacks 4 o más veces al día es de -2.57, si mantenemos el resto de las variables constantes, el incremento de una unidad para estimado de 
+consumo_semanal_snacks 4 o más veces al día corresponde a una baja de 2.57kg, en promedio en el peso de la persona. => **Significativa**
+
+- El coeficiente estimado de consumo_semanal_snacks Dato perdido es de -4.44, si mantenemos el resto de las variables constantes, el incremento de una unidad para 
+consumo_semanal_snacksDato perdido corresponde a una baja de 4.44kg, en promedio en el peso de la persona. => **Significativa**
+
+Los coeficientes para las diferentes categorias de consumo semanal de snacks algunos son significativos y otros no.
+
+Realizamos el test de anova para ver la significancia de las variables en su conjunto
+
+```{r, warning=F, message=F}
+tidy(anova(modelo_ln_2_r))
+```
+
+La tabla de ANOVA muestra que, según el resultado del test F, **la variable consumo_semanal_snacks en su conjunto resulta estadísticamente significativa para explicar al precio (p-valor < 0.05)**.
+
+### Redefinicion de categóricas
+
+Creamos una variable nueva que agrupe las tres variables categóricas que nos dieron una NO significancia en el análisis previo, las mismas serian
+
+- [3] "consumo_semanal_snacks_relevel1 vez al día"                                 
+
+- [4] "consumo_semanal_snacks_relevel2 veces al día"                               
+
+- [5] "consumo_semanal_snacks_relevel3 veces al día"     
+
+
+```{r, warning=F, message=F}
+
+encuesta_salud_train %>% glimpse
+
+encuesta_salud_second_model_agrupado = encuesta_salud_train %>%
+                              # Seleccionamos las variables de interés
+                              dplyr::select(edad, genero, altura, peso,consumo_semanal_snacks)
+
+encuesta_salud_second_model_agrupado$consumo_semanal_snacks_relevel <- relevel(as.factor(encuesta_salud_second_model_agrupado$consumo_semanal_snacks), ref = 8)
+
+
+```
+
+Redefinimos la variable agrupando los valores categorizados como 1 vez al día, 2 veces al día y tres veces al día, en 1 a 3 veces al dia.
+```{r, warning=F, message=F}
+
+encuesta_salud_second_model_agrupado = encuesta_salud_second_model_agrupado %>% mutate(consumo_semanal_snacks = case_when(startsWith(consumo_semanal_snacks, "1 vez al día") ~ "1 a 3 veces al dia",
+                                 startsWith(consumo_semanal_snacks, "2 veces al día") ~ "consumo_semanal_snacks 1 a 3 veces al dia",
+                                 startsWith(consumo_semanal_snacks, "3 veces al día") ~ "consumo_semanal_snacks 1 a 3 veces al dia",
+                                 TRUE ~ consumo_semanal_snacks))
+```
+
+
+```{r, warning=F, message=F}
+#encuesta_salud_second_model_agrupado$consumo_semanal_snacks
+```
+
+
+```{r, warning=F, message=F}
+modelo_ln_2_r_agrupado <- lm(peso ~ consumo_semanal_snacks + edad + genero + altura + (edad * genero), data = encuesta_salud_second_model_agrupado)
+```
+
+```{r, warning=F, message=F}
+# Resumen del modelo
+tidy_ln_2_r_agrupado <- tidy(modelo_ln_2_r_agrupado, conf.int = TRUE)
+print(tidy_ln_2_r_agrupado)
+```
+
+Observamos que la redefinición de las variables no significativas generando un agrupamiento para de las mismas mantiene la no significancia de estos valores para predecir el peso
+de una persona.
+
+### Evaluación de modelo
+
+Ejecutamos las funcines tidy, glance y summary para obtener tanto la significacia de los atributos del modelo, la significancia del modelo en si (Test F) y la variabilidad del 
+mismo (R-cuadrado y R-cuadrado ajustado).
+
+```{r, warning=F, message=F}
+options("scipen"=1)
+tidy_ln_2_r %>%
+  dplyr::select(term, statistic, p.value, conf.low, conf.high)
+```
+
+```{r, warning=F, message=F}
+glance(modelo_ln_2_r)
+```
+
+```{r, warning=F, message=F}
+summary(modelo_ln_2_r)
+```
+
+El porcentaje de variabilidad que explica este nuevo modelo es de **R-cuadrado = 0.359**, **R-cuadrado ajustado = 0.358**
+Evaluando la significativida del modelo, obtenemos F-statistic: 356.3 on 11 and 7012 DF,  p-value: < 2.2e-16 **Modelo significativo**
+
+<!-- 4) Modelos propios y evaluación
+Realizar 2 modelos lineales múltiples adicionales y explicar brevemente la lógica detrás de los mismos (se
+valorará la creación y/o inclusión de variables nuevas).
+Evaluar la performance del modelo inicial, el modelo categóricas con las categorías redefinidas de la
+variable consumoSemanalSnacks y los modelos desarrollados en este punto en el dataset de entrenamiento y
+evaluación (usar dataset “encuesta_salud_test.csv”). La evaluación de performance consiste en comparar
+la performance en términos del R cuadrado ajustado, RMSE y MAE sobre el set de entrenamiento y en
+términos de RMSE y MAE sobre el set de evaluación.
+¿Cuál es el mejor modelo para nuestro objetivo de predecir el peso? ¿Por qué? -->
+
+<!-- 
+¿Cómo se calcula mi IMC?
+¿Cómo se calcula el IMC? Con el sistema métrico, la fórmula para el IMC es el peso en kilogramos dividido por la estatura en metros cuadrados. Debido a que la estatura por lo general se mide en centímetros, divida la estatura en centímetros por 100 para obtener la estatura en metros.
+-->
+
+
+## Modelos propios y evaluación
+
+### Creación de nuevos modelos
+
+Proponemos un modelo que evalue el peso a partir del nivel educativo, consumo_semanal_comida_grasa, edad, genero, altura y una interrelación de altura, edad y género.
+
+**f(peso) ~ nivel_educativo + consumo_semanal_comida_grasa + edad + genero + altura + (altura * edad * genero)**
+
+Seleccionamos nuestras variables de interés
+
+```{r, warning=F, message=F}
+encuesta_salud_train %>% glimpse
+
+encuesta_salud_third_model = encuesta_salud_train %>%
+                              # Seleccionamos las variables de interés
+                              dplyr::select(edad, genero, altura, peso,nivel_educativo,consumo_semanal_comida_grasa)
+
+encuesta_salud_third_model %>% glimpse
+
+```
+
+Generamos el modelo lineal
+```{r, warning=F, message=F}
+modelo_ln_3_r <- lm(peso ~ nivel_educativo + consumo_semanal_comida_grasa + edad + genero + altura + (altura * edad * genero), data = encuesta_salud_third_model)
+# Resumen del modelo
+tidy_ln_3_r <- tidy(modelo_ln_3_r, conf.int = TRUE)
+print(tidy_ln_3_r)
+```
+
+```{r, warning=F, message=F}
+glance(modelo_ln_3_r)
+```
+
+```{r, warning=F, message=F}
+tidy(anova(modelo_ln_3_r))
+```
+
+Proponemos un modelo que evalue el peso a partir del nivel educativo, consumo_semanal_comida_grasa, genero, altura y una interrelación de dias consumo comida rápida y genero
+**f(peso) ~ nivel_educativo + consumo_semanal_comida_grasa + genero + altura + (dias_consumo_comida_rapida * genero)**
+
+Seleccionamos nuestras variables de interés
+```{r, warning=F, message=F}
+encuesta_salud_train %>% glimpse
+
+encuesta_salud_fourth_model = encuesta_salud_train %>%
+                              # Seleccionamos las variables de interés
+                              dplyr::select(edad, genero, altura, peso,nivel_educativo,dias_consumo_comida_rapida)
+
+encuesta_salud_fourth_model %>% glimpse
+
+```
+
+Generamos nuestro modelo lineal
+```{r, warning=F, message=F}
+modelo_ln_4_r <- lm(peso ~ nivel_educativo + dias_consumo_comida_rapida + genero + altura + (dias_consumo_comida_rapida * genero), data = encuesta_salud_fourth_model)
+# Resumen del modelo
+tidy_ln_4_r <- tidy(modelo_ln_4_r, conf.int = TRUE)
+print(tidy_ln_4_r)
+```
+
+```{r, warning=F, message=F}
+glance(modelo_ln_4_r)
+```
+
+```{r, warning=F, message=F}
+tidy(anova(modelo_ln_4_r))
+```
+
+### Evaluación de modelos
+
+Agrupamos todos los modelos que nos interesa comparar, en este caso es el modelo inicial, el modelo categóricas con las categorías redefinidas de la
+variable consumoSemanalSnacks y los dos modelos desarrollados en este punto, interrelación (altura * edad * genero) y (dias_consumo_comida_rapida * genero)
+
+```{r, warning=F, message=F}
+# armamos lista con todos los modelos
+models <- list(modelo_ln_4_r = modelo_ln_4_r, modelo_ln_3_r = modelo_ln_3_r, modelo_ln_2_r = modelo_ln_2_r, modelo_ln_base = modelo_ln_base)
+# calculamos las variables resumen
+map_df(models, tidy, .id = "model")
+```
+
+#### Selección del mejor modelo en training
+
+Utilizamos la función augment para predecir el peso sobre el dataset de training
+```{r, warning=F, message=F}
+lista_predicciones_training = map(.x = models, .f = augment) 
+```
+
+Calculamos el RMSE para todos los modelos a evaluar
+```{r, warning=F, message=F}
+map_dfr(.x = lista_predicciones_training, .f = rmse, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+```
+
+Calculamos el MAE para todos los modelos a evaluar
+```{r, warning=F, message=F}
+map_dfr(.x = lista_predicciones_training, .f = mae, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+```
+
+Obtenemos el R-cuadrado y R-cuadrado ajustado para poder comparar la variabilidad de los modelos
+```{r, warning=F, message=F}
+df_evaluacion_train = map_df(models, glance, .id = "model") %>%
+  # ordenamos por R2 ajustado
+  arrange(desc(adj.r.squared))
+
+df_evaluacion_train
+```
+
+Concluimos sobre el dataset de training
+
+- Analizando el R-cuadrado ajustado, el mejor modelo resulta ser modelo_ln_2_r que explica el peso en función de la altura, edad, género, dias de actividad física semanal y consumo diario de alcohol
+- Este modelo (modelo_ln_2_r) explica 35,8% de la variabilidad del peso, es decir, más que todos los restantes modelos.
+- El modelo con menor RMSE es el modelo_ln_3_r con un valor de 9.87, no coincide con el mejor R-cuadrado ajustado, pero si por una diferencia mínima modelo_ln_2_r (9.88)
+- En cuanto al MAE, tanto el modelo modelo_ln_2_r como modelo_ln_3_r, son los que tienen mejores resultados con 7.43
+
+#### Evaluación en el dataset de testing
+
+Utilizamos la función augment para predecir el peso sobre el dataset de training
+```{r, warning=F, message=F}
+# Aplicamos la función augment a los 4 modelos con el set de testing
+encuesta_salud_test$consumo_semanal_snacks_relevel <- relevel(as.factor(encuesta_salud_test$consumo_semanal_snacks), ref = 8)
+lista_predicciones_testing = map(.x = models, .f = augment, newdata = encuesta_salud_test) 
+```
+
+Calculamos el RMSE para todos los modelos a evaluar con las predicciones en training
+```{r, warning=F, message=F}
+# Obtenemos el RMSE para los 4 modelos
+map_dfr(.x = lista_predicciones_testing, .f = rmse, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+```
+
+Calculamos el MAE para todos los modelos a evaluar con las predicciones en training
+```{r, warning=F, message=F}
+map_dfr(.x = lista_predicciones_testing, .f = mae, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+```
+
+Concluimos sobre el dataset de testing:
+
+- Tanto el modelo modelo_ln_2_r como el modelo_ln_3_r son los que mejor RMSE tienen como en la medición sobre training con 10.2
+- Tanto el modelo modelo_ln_2_r como el modelo_ln_3_r son los que mejor MAE tienen como en la medición sobre training con 7.56
+
+<!-- 5) Diagnóstico del modelo
+Analizar en profundidad el cumplimiento de los supuestos del modelo lineal para el modelo inicial. -->
+
+
+## Diagnóstico del modelo
+
+Realizaremos diferentes pruebas para validar el cumplimiento o no de los supuestos del modelo lineal, estos consisten de: εi∼N(0,σ2) independientes entre sí.
+Los errores son inobservables, por lo tanto tendremos que trabajar con su correlato empírico: los residuos en las técnicas de diagnóstico.
+
+Procedemos a graficar el comportamiento de los residuos del modelo
+
+
+```{r, warning=F, message=F}
+au_modelos = map_df(models, augment, .id = "model")
+
+g1 = ggplot(au_modelos %>% filter(model == "modelo_ln_base"), 
+       aes(.fitted, .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Residuos vs valores predichos MODELO BASE") + 
+  theme_bw()
+
+g2 = ggplot(au_modelos %>% filter(model == "modelo_ln_base"), 
+       aes(sample = .std.resid)) +
+  stat_qq() +
+  geom_abline() +
+  labs(title = "Normal QQ plot MODELO BASE") + 
+  theme_bw()
+
+g3 = ggplot(au_modelos %>% filter(model == "modelo_ln_base"), 
+       aes(.fitted, sqrt(abs(.std.resid)))) +
+  geom_point() +
+  geom_smooth(se = FALSE) + 
+  theme_bw() +
+  labs(title = "Scale-location plot MODELO BASE")
+
+g4 = ggplot(au_modelos %>% filter(model == "modelo_ln_base"), 
+       aes(.hat, .std.resid)) +
+  geom_vline(size = 2, colour = "white", xintercept = 0) +
+  geom_hline(size = 2, colour = "white", yintercept = 0) +
+  geom_point() + 
+  geom_smooth(se = FALSE) + 
+  theme_bw() +
+  labs(title = "Residual vs leverage MODELO BASE")
+# grafico todos juntos
+grid.arrange(g1, g2, g3, g4, nrow = 2)
+
+
+```
+
+Conclusiones:
+
+- Residuos vs valores predichos: Parece no existir estructura en los datos, la varianza no parece incrementarse con los valores predichos, por lo que **satisface el supuesto de homocedasticidad**.
+- Normal QQ plot: Tanto el extremo superior derecho en particular, como el izquierdo inferior no se ajustan a la distribución teórica, **no siguen una distribución normal**
+- Residual vs leverage: **Existen algunos puntos de alto leverage**, habria que realizar un analisis mas profundo para entender la influencia de estos valores sobre el modelo, gráficamente no es simple determinarlo
+
+Diagnóstico del modelo: **El modelo creado no cumple con los supuestos del modelo lineal**. Parecen existir problemas de falta de normalidad y presencia de observaciones de alto leverage.
+
+
+<!-- 6) Modelo Robusto
+Leer el archivo “encuesta_salud_modelo6.csv”. Este último consiste en el dataset original de train con la
+incorporación de algunas observaciones adicionales que pueden incluir valores atípicos. En particular, observar
+la relación entre peso y altura ¿Qué ocurre con estos nuevos datos?
+Entrenar el modelo inicial con estos nuevos datos y comentar qué se observa en los coeficientes estimados y
+las métricas de evaluación (R cuadrado ajustado, RMSE y MAE) respecto al modelo entrenado con el set de
+entrenamiento original.
+Entrenar un modelo robusto con la misma especificación que el modelo inicial sobre los nuevos datos.
+Comparar los coeficientes y su performance (RMSE y MAE) respecto al modelo inicial no robusto entrenado
+en este punto. ¿Qué puede concluir al respecto?
+Nota: los registros que se suman en este punto son observaciones ficticias que se generaron a partir de
+observaciones reales del set de datos original. -->
+
+## Modelo robusto
+
+
+### Análisis del dataset
+
+Leemos el nuevo archivo con la incorporación de algunas observaciones adicionales que pueden incluir valores atípicos
+
+```{r, warning=F, message=F}
+library(MASS)
+
+encuesta_salud_train_original = read_csv("/Users/dfontenla/Maestria/2022C2/EEA/practica/repo/EEA-2022/TP1/encuesta_salud_modelo6.csv") %>% mutate(id = 1:nrow(.)) 
+encuesta_salud_train_original %>% glimpse()
+```
+
+Graficamos la relación peso / altura para observar las anomalias insertadas en el nuevo dataset
+```{r, warning=F, message=F}
+
+encuesta_salud_train_original %>% ggplot(., aes(x = altura, y = peso)) + 
+  geom_point(alpha=0.5) + #capa de los datos
+  theme_bw() +
+  labs(title="Modelo Lineal Múltiple: Altura x Peso", x="Altura", y="Peso") 
+```
+
+Observamos que existen una cantidad de puntos relevantes que se alejan de forma categórica de la distribución general, una importante cantidad de outliers
+
+
+Nos quedamos con las variables de interés para reproducir el modelo base
+
+```{r, warning=F, message=F}
+
+encuesta_salud_train_original_base = encuesta_salud_train_original %>%
+                              # Seleccionamos las variables de interés
+                              dplyr::select(edad, genero, altura, peso,dias_actividad_fisica_semanal,consumo_diario_alcohol)
+
+encuesta_salud_train_original_base %>% glimpse
+
+```
+
+Graficamos las relaciones entre variables del nuevo dataset
+
+```{r, warning=F, message=F}
+
+encuesta_salud_train_original_base %>% ggpairs(aes(color=genero), upper = list(continuous = wrap("cor", size = 3, hjust=0.8, alignPercent=0.15)), legend = 25) + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45, vjust=0.5), legend.position = "bottom")
+
+```
+
+Representamos la correlación de Pearson entre variables
+
+```{r, warning=F, message=F}
+encuesta_salud_train_original_base %>% 
+ correlate() %>% # convierte la matriz de corr en dataframe
+  shave() %>% # solo muestra información debajo de la diagonal principal
+  fashion() # acomoda los datos en forma tidy (por ej. redondeo de decimales)
+```
+
+Podemos observar que la correlación entre peso y altura en relación al dataset base, disminuyó considerablemente pasando de un 0.5 a un 0.29, gráficamente
+se visualiza una clara correspondencia entre estos valores, ahora bien **para el nuevo dataset existe una cantidad de datos outliers significativos**
+
+
+### Creación del modelo
+
+Ajustamos el dataset a nuestro modelo lineal múltiple base (peso ~ edad + genero + altura + dias_actividad_fisica_semanal + consumo_diario_alcohol)
+```{r, warning=F, message=F}
+# ajustamos modelo lineal múltiple
+modelo_ds_original_ln_base <- lm(peso ~ edad + genero + altura + dias_actividad_fisica_semanal + consumo_diario_alcohol, data = encuesta_salud_train_original_base)
+# Resumen del modelo
+tidy_ln_ds_original_base <- tidy(modelo_ds_original_ln_base, conf.int = TRUE)
+tidy_ln_ds_original_base
+```
+
+Realizamos un diagnóstico del modelo a través de los residuos
+```{r, warning=F, message=F}
+plot(modelo_ds_original_ln_base)
+```
+
+Vemos la significancia de los atributos
+
+```{r, warning=F, message=F}
+options("scipen"=1)
+tidy_ln_ds_original_base %>%
+  dplyr::select(term, statistic, p.value, conf.low, conf.high)
+```
+
+Analizamos la variabilidad explicativa del modelo
+```{r, warning=F, message=F}
+glance(modelo_ds_original_ln_base)
+```
+
+Observamos que la variabilidad porcentual explicada por R-cuadrado y R-cuadrado ajustado disminuye considerablemente en relación al mismo modelo entrenado en el dataset sin outliers
+
+```{r, warning=F, message=F}
+tidy(anova(modelo_ds_original_ln_base))
+```
+
+### Evaluación comparativa del modelo base con el nuevo dataset y el original
+
+Agrupamos los modelos para poder compararlos
+```{r, warning=F, message=F}
+# armamos lista con todos los modelos
+models_leverage <- list(modelo_ds_original_ln_base = modelo_ds_original_ln_base, modelo_ln_base = modelo_ln_base)
+# calculamos las variables resumen
+map_df(models_leverage, tidy, .id = "model")
+```
+
+```{r, warning=F, message=F}
+lista_predicciones_training_leverage = map(.x = models_leverage, .f = augment) 
+```
+
+Utilizamos la función glance sobre todos los modelos para comparar la variabilidad de los mismos
+```{r, warning=F, message=F}
+df_evaluacion_train_leverage = map_df(models_leverage, glance, .id = "model") %>%
+  # ordenamos por R2 ajustado
+  arrange(desc(adj.r.squared))
+df_evaluacion_train_leverage
+```
+
+
+Calculamos el RMSE para todos los modelos a evaluar
+```{r, warning=F, message=F}
+map_dfr(.x = lista_predicciones_training_leverage, .f = rmse, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+```
+
+Calculamos el MAE para todos los modelos a evaluar
+```{r, warning=F, message=F}
+map_dfr(.x = lista_predicciones_training_leverage, .f = mae, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+```
+
+Realizando la comparación de las metricas R-cuadrado ajustado, RMSE y MAE, observamos que:
+
+- En la evaluación del nuevo dataset con outliers, el R-cuadrado ajustado disminuyó significativamente por lo que nuestro modelo 
+representa una variabilidad de los datos menor **(modelo_ln_base:0.354 -  modelo_ds_original_ln_base:0.109)**
+- El error cuadrático medio aumenta de forma considerable **(modelo_ln_base:9.91 -  modelo_ds_original_ln_base:15.7)**
+- El error absoluto MAE, también crece de forma cosiderable  **(modelo_ln_base:7.46 -  modelo_ds_original_ln_base:9.23)**
+
+Concluimos con lo observado que nuestro modelo es sensible a outliers, y ante la precencia de estos, nuestras métricas de performance del modelo empeoran drásticamente
+
+### Creación modelo linear robusto
+
+Ante la apreciación de como empeora nuestro modelo ante la existencia de outliers en nuestro dataset, procedemos a realizar un entrenamiento con un modelo lineal
+robusto el cual esperaremos que brinde mejores resultados debido a la ponderación que realizan sobre la influencia de los casos atípicos
+```{r, warning=F, message=F}
+# ajustamos modelo lineal múltiple
+modelo_ds_original_ln_robust_base <- rlm(peso ~ edad + genero + altura + dias_actividad_fisica_semanal + consumo_diario_alcohol, data = encuesta_salud_train_original_base)
+# # Resumen del modelo
+```
+
+```{r, warning=F, message=F}
+tidy(modelo_ds_original_ln_base)
+```
+
+```{r, warning=F, message=F}
+tidy(modelo_ds_original_ln_robust_base)
+```
+
+Comparando coeficientes, podemos ver como los relacionados al modelo robusto, no sufren grandes modificaciones en relación al modelo entrenado con el dataset
+sin outliers, mientras que en el modelo lineal común entrenado con el dataset con outliers, los coeficientes cambian considerablemente debido a estos datos.
+
+```{r, warning=F, message=F}
+options("scipen"=1)
+tidy_ln_ds_original_robust <- tidy(modelo_ds_original_ln_robust_base, conf.int = TRUE)
+tidy_ln_ds_original_robust %>% dplyr::select(term, statistic, conf.low, conf.high)
+
+```
+
+### Evaluación comparativa del modelo común y robusto
+
+```{r, warning=F, message=F}
+models_robust <- list(modelo_ln_5_robust = modelo_ds_original_ln_robust_base, modelo_ln_5_base = modelo_ds_original_ln_base)
+```
+
+```{r, warning=F, message=F}
+robust_predictions_over_training = map(.x = models_robust, .f = augment) 
+map_dfr(.x = robust_predictions_over_training, .f = rmse, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+map_dfr(.x = robust_predictions_over_training, .f = mae, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+
+```
+
+- Observamos que el RMSE no mejora con el modelo robusto (16.0)
+- Notamos una mejora importante en el error absoluto MAE, enter el modelo lineal (9.23) y robusto (8.76)
+
+Evaluamos la performance de los modelos sobre el conjunto de testing
+
+```{r, warning=F, message=F}
+# Aplicamos la función augment a los 4 modelos con el set de testing
+lista_predicciones_testing_robust = map(.x = models_robust, .f = augment, newdata = encuesta_salud_test) 
+# Obtenemos el RMSE para los 4 modelos
+map_dfr(.x = lista_predicciones_testing_robust, .f = rmse, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+map_dfr(.x = lista_predicciones_testing_robust, .f = mae, truth = peso, estimate = .fitted, .id="modelo") %>% arrange(.estimate)
+
+```
+
+Evaluando los modelos sobre el conjunto de pruebas
+
+- El error cuadrático medio disminuye con el modelo robusto (10.3) en comparacion con el lineal (10.6) para el dataset con outliers, pero no de forma significativa, no es una métrica robusta, sensible a outliers
+- El error absoluto si disminuye con el modelo robusto (7.53) en comparación con el lineal (8.15) de forma significativa para el dataset con outliers, dando un valor similar a la medición del modelo
+sin la presencia de los valores atípicos 
+
+Conclusión, ante la presencia de una cantidad significativa de outliers, utilizar un modelo lineal robusto nos sirvio para poder tener un modelo que ante 
+la presencia de estos valores atípicos se sigue comportando de una manera similar al modelo que fue entrenado sin outliers, mientras que el modelo lineal 
+no robusto, siendo entrenado en un dataset con outliers, cambia significativamente sus coeficientes. 
+Hace sentido poner foco sobre la métria MAE ya que es más robusto cuando los datos tienen outliers o datos atípicos y es la mejor opción a usar en esos casos
+
+#### Consideraciones
+Todos los fragmentos de códigos utilizados en el trabajo práctico fueron orientado a partir de notebooks propuestos por la cátedra
+En cuanto al modelo robusto donde utilice la librería MAAS, algunas fuentes de ejemplo fueron [link1](https://stats.oarc.ucla.edu/r/dae/robust-regression/), [link2](https://www.statology.org/robust-regression-in-r/)

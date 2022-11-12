@@ -37,9 +37,6 @@ setwd(paste0( "./exp/", PARAM$experimento, "/"))   #Establezco el Working Direct
 #me quedo SOLO con los BAJA+2
 dataset  <- dataset[  clase_ternaria =="BAJA+2"  & foto_mes>=202006  & foto_mes<=202105, ] 
 
-
-nrow(dataset)
-
 #armo el dataset de los 12 meses antes de la muerte de los registros que analizo
 dataset12  <- copy( dataset[  numero_de_cliente %in%  dataset[ , unique(numero_de_cliente)]  ]  )
 

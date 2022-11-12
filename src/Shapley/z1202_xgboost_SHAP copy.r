@@ -33,12 +33,13 @@ setwd(paste0( "./exp/", PARAM$experimento, "/"))   #Establezco el Working Direct
 
 #agrego a mis fieles canaritos
 # nada temo porque Ellos son mis centinelas y delataran a los embusteros
-for( i in 1:20 )  dataset[ , paste0( "canarito", i ) := runif(nrow(dataset)) ]
+#for( i in 1:20 )  dataset[ , paste0( "canarito", i ) := runif(nrow(dataset)) ]
 
 #debo poner la clase en {0,1}
-dataset[ , clase01 := ifelse( clase_ternaria %in% c("BAJA+2"), 1, 0) ]
+#dataset[ , clase01 := ifelse( clase_ternaria %in% c("BAJA+2"), 1, 0) ]
+dataset[ , clase01 := ifelse( clase_ternaria %in% c("CONTINUE"), 0, 1) ]
 
-
+nrow(dataset[ foto_mes==202103, col_buenas, with=FALSE])
 col_buenas  <- setdiff(colnames(dataset) ,c("clase_ternaria","clase01") )
 
 
@@ -46,7 +47,7 @@ col_buenas  <- setdiff(colnames(dataset) ,c("clase_ternaria","clase01") )
 dtrain <- xgb.DMatrix( data=  as.matrix(dataset[ foto_mes==202103, col_buenas, with=FALSE]),
                        label= dataset[ foto_mes==202103, clase01 ]
                      )
-
+nrow(dtrain)
 
 #Entreno con hiperparametros que calcule en una Optimizacion Bayesiana PREVIA
 param_best <- list(nrounds= 265, max_leaves= 10, eta= 0.04, colsample_bytree= 0.43, gamma= 4.3)
@@ -66,35 +67,50 @@ modelo_final  <- xgboost(data= dtrain,
 
 #Calculo la importancia de variables  TRADICIONAL
 tb_importancia  <- xgboost::xgb.importance( model= modelo_final )
+tb_importancia
 
-
+dtest <- dataset[ foto_mes==202103 ]
 dapply  <- dataset[ foto_mes==202105 ]
+nrow(dapply)
+nrow(dtest)
 
 #aplico el modelo a los datos nuevos
 prediccion  <- predict( modelo_final,
                         data.matrix( dapply[ , col_buenas, with=FALSE] )  )
-
 nrow( dapply )
-nrow( dapply[clase01 == "0"] )
+nrow( dapply[clase01 == "1"] )
+nrow( dtest[clase01 == "1"] )
 
 #valores Shapley de CADA registro
 # devuelve una matrix
 shap_values  <- shap.values(xgb_model = modelo_final, 
                             X_train = as.matrix( dapply[ , col_buenas, with=FALSE]))
 
-dtest <- dataset[ foto_mes==202103 ]
+shap_values2  <- shap.values(xgb_model = modelo_final, 
+                            X_train = as.matrix( dtest[ , col_buenas, with=FALSE]))                            
+
 
 shap_values_churn  <- shap.values(xgb_model = modelo_final, 
-                            X_train = as.matrix( dtest[clase01 == "1" , col_buenas, with=FALSE]))         
+                            X_train = as.matrix( dtest[clase01 == "1" , col_buenas, with=FALSE]))          
+
+nrow(dapply[ , col_buenas, with=FALSE])
+nrow(shap_values$shap_score)
 shap_values
 colnames(shap_values$shap_score)
 
+fwrite( shap_values$shap_score, 
+          file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", "shap", ".csv" ),
+          sep= "," )
+
 fwrite( shap_values_churn$shap_score, 
-          file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", "shap2", ".csv" ),
+          file= paste0(  PARAM$experimento, "_", format(Sys.time(), "%Y%m%d %H%M%S"), "_", "shap_values_churn_class_joined", ".csv" ),
           sep= "," )
 
 bias  <-  shap_values$BIAS0[[1]]
-nrow( shap_values_churn$shap_score )
+
+nrow( shap_values$shap_score )
+
+nrow( shap_values2$shap_score )
 ncol( shap_values$shap_score )
 
 dapply[,clase01]
@@ -102,6 +118,7 @@ dapply[,clase01]
 shap_values$shap_score[ 1, ]
 #calculo el score del primer registros
 primero_score  <- sum(shap_values$shap_score[1, ]) + shap_values$BIAS[[1]]
+primero_score
 
 #utillizando la funcion logistica, paso de scrore a probabilidad
 primero_prob  <- 1/ ( 1 + exp( - primero_score) )
@@ -115,6 +132,7 @@ shap_values$shap_score[ 1, ]
 
 #El registro con mas prob de BAJA+2,  que justo es un BAJA+1 ...
 dt  <- shap_values$shap_score[ 38187,]
+shap_values$shap_score[ 38187,]
 dt2  <- data.table( names(dt), transpose( dt ) )
 colnames( dt2 )  <- c("columna","Shapley" )
 dt2[ , Shapley_abs := abs( Shapley ) ]
