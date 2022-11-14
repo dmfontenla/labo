@@ -19,9 +19,9 @@ require("mlrMBO")
 
 #Parametros del script
 PARAM  <- list()
-PARAM$experimento <- "HT9410"
+PARAM$experimento <- "HT9410_c3test" 
 
-PARAM$exp_input  <- "TS9310"
+PARAM$exp_input  <- "TS9310_c3test"
 # FIN Parametros del script
 
 
@@ -33,7 +33,7 @@ options(error = function() {
 })
 #------------------------------------------------------------------------------
 
-ksemilla  <- 102191
+ksemilla  <- 864379
 
 kcrossvalidation_folds  <- 5  #En caso que se haga cross validation, se usa esta cantidad de folds
 
@@ -72,8 +72,8 @@ param_lgb_basicos  <- list(
 #Aqui se cargan los hiperparametros que se optimizan en la Bayesian Optimization
 hs <- makeParamSet( 
          makeNumericParam("learning_rate",    lower=    0.005, upper=    0.3),
-         makeNumericParam("feature_fraction", lower=    0.2  , upper=    1.0),
-         makeIntegerParam("min_data_in_leaf", lower=    0L   , upper=  8000L),
+         makeNumericParam("feature_fraction", lower=    0.2  , upper=    8.0),
+         makeIntegerParam("min_data_in_leaf", lower=    100L   , upper=  8000L),
          makeIntegerParam("num_leaves",       lower=   16L   , upper=  2048L)
         )
 
