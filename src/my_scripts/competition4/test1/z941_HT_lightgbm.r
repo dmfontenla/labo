@@ -19,7 +19,7 @@ require("mlrMBO")
 
 #Parametros del script
 PARAM  <- list()
-PARAM$experimento <- "HT9410_c3test" 
+PARAM$experimento <- "HT9410_c3test"
 
 PARAM$exp_input  <- "TS9310_c3test"
 # FIN Parametros del script
@@ -29,7 +29,7 @@ PARAM$exp_input  <- "TS9310_c3test"
 options(error = function() { 
   traceback(20); 
   options(error = NULL); 
-  stop("exiting after script error") 
+  stop("exiting after script error ok") 
 })
 #------------------------------------------------------------------------------
 
