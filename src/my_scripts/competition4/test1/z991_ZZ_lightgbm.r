@@ -166,7 +166,7 @@ for( i in  1:PARAM$modelos )
   }
 
 
-  #borro y limpio la memoria para la vuelta siguiente del for
+  #borro y limpio la memoria para la vuelta siguiente del for 
   rm( tb_prediccion )
   rm( tb_importancia )
   rm( modelo_final)
