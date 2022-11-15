@@ -14,8 +14,8 @@ require("lightgbm")
 
 #Parametros del script
 PARAM  <- list()
-PARAM$experimento  <- "DR9130"
-PARAM$dataset  <- "./exp/CA9060/dataset.csv.gz"
+PARAM$experimento  <- "DR9130_4"
+PARAM$dataset  <- "./exp/CA9060_4/dataset.csv.gz"
 # FIN Parametros del script
 
 #------------------------------------------------------------------------------
@@ -91,8 +91,8 @@ dataset[ foto_mes<=202103,
 
 campos_buenos  <- setdiff( colnames(dataset), c("clase_ternaria","clase01") )
 #dejo los datos en el formato que necesita LightGBM
-dtrain  <- lgb.Dataset( data= data.matrix(  dataset[ foto_mes %in% c( 202103, 202104, 202105), campos_buenos, with=FALSE]),
-                        label= dataset[foto_mes %in% c( 202103, 202104, 202105), clase01] )
+dtrain  <- lgb.Dataset( data= data.matrix(  dataset[ foto_mes %in% c( 202103, 202104, 202105, 202106), campos_buenos, with=FALSE]),
+                        label= dataset[foto_mes %in% c( 202103, 202104, 202105, 202106), clase01] )
 
 #genero el modelo
 #estos hiperparametros  salieron de una laaarga Optmizacion Bayesiana
@@ -117,7 +117,7 @@ campos_ordenados  <-  setdiff(  campos_ordenados,  c( "foto_mes","clase_ternaria
 dataset[  , foto_mes := as.character( foto_mes ) ]
 
 
-periodos_analisis  <- c( 202103, 202104, 202105, 202107 )
+periodos_analisis  <- c( 202103, 202104, 202105, 202107, 202109 )
 GLOBAL_colores <-  viridis_pal()(length( periodos_analisis ) )
 
 pdf("densidades_orignales.pdf")
