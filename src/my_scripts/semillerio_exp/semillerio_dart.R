@@ -16,9 +16,9 @@ require("primes")
 
 #Parametros del script
 PARAM <- list()
-PARAM$experimento <- "ZZ9410_semillerio"
-PARAM$exp_input <- "HT9410_4"
-
+PARAM$experimento <- "ZZ9410_semillerio_DART"
+PARAM$exp_input <- "HT9420_4_DART"
+ 
 # PARAM$modelos  <- 2
 PARAM$modelo <- 1 # se usa el mejor de la OB, pero a futuro podria variar esto
 PARAM$semilla_primos <- 864379

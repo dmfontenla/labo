@@ -19,7 +19,7 @@ PARAM <- list()
 PARAM$experimento <- "ZZ9410_semillerio_4"
 PARAM$exp_input <- "HT9410_4"
 
-# PARAM$modelos  <- 2
+# PARAM$modelos  <- 2 
 PARAM$modelo <- 1 # se usa el mejor de la OB, pero a futuro podria variar esto
 PARAM$semilla_primos <- 864379
 PARAM$semillerio <- 10 # ¿De cuanto será nuestro semillerio?
