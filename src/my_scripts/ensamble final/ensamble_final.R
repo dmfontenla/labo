@@ -11,7 +11,7 @@ library('caret')
 set.seed(1)
 
 #Aca ingresar la carpeta donde estan las predicciones
-base_dir = "/Users/dfontenla/Maestria/2022C2/DMEyF/experimento/"
+base_dir = "/Users/dfontenla/Maestria/2022C2/DMEyF/c4_models/"
 setwd( base_dir)
 
 #prob_cols = c("prob_pos_21.csv", "prob_pos_04.csv", "prob_pos_13.csv","prob_pos_01.csv", "prob_pos_35.csv","prob_pos_25.csv",
@@ -32,13 +32,16 @@ for (i in files){
   print(i)
   probs = read.csv(i, sep="\t")
   setorder(  probs, -numero_de_cliente)
-  models$num_cli = probs$numero_de_cliente
+  models$numero_de_cliente = probs$numero_de_cliente
   models[,paste0('prob_', i)] = probs$prob
   prob_cols <- c(prob_cols,paste0("prob_",i))
-  rank_cols <- c(rank_cols,paste0("rank_",i))
+  rank_cols <- c(rank_cols,paste0("rank_prob_",i))
 }
 
 models
+prob_cols
+rank_cols
+
 models$prob_avg = rowMeans(models[,..prob_cols])
 models$prob_max <- apply(models[,..prob_cols], 1, max, na.rm=TRUE)
 
@@ -88,13 +91,13 @@ models$rank_prob_pos_31.csv = 1:nrow(models)
 
 models
 
-setorder(models, -num_cli)
+setorder(models, -numero_de_cliente)
 
 models$prob_rank_avg = rowMeans(models[,..rank_cols])
 models
 models[1:10]
 
-setorder(models, -num_cli)
+setorder(models, -numero_de_cliente)
 
 
 
@@ -120,7 +123,7 @@ cortes  <- seq( from=  8500,
 
 str(models)
 dscheck = data.table()
-dscheck$num_cli = models$num_cli
+dscheck$numero_de_cliente = models$numero_de_cliente
 col = prob_cols[1]
 dscheck$prob = models[,..col]
 dscheck
@@ -132,13 +135,12 @@ base_dir_results = "/Users/dfontenla/Maestria/2022C2/DMEyF/final_results"
 for( corte in cortes ) {
   new_row <- data.table("envios" = corte)
   results <- rbindlist(list(results, new_row),fill=TRUE)
-  for(model in c(prob_cols,"prob_avg","prob_max","prob_avg_bests","prob_max_bests","prob_avg_lows","prob_max_lows",
-  "prob_avg_without_best","prob_max_without_best","prob_avg_differents","prob_max_differents")) {
+  for(model in c(prob_cols,"prob_avg","prob_max")) {
     if(!model %in% colnames(results)){
       results[, eval(model)] <- 0
     }
     dscheck = data.table()
-    dscheck$num_cli = models$num_cli
+    dscheck$numero_de_cliente = models$numero_de_cliente
     dscheck$prob = models[,..model]
     setorder( dscheck, -prob )
     dscheck[  , Predicted := 0L ]
@@ -152,7 +154,7 @@ for( corte in cortes ) {
                         sprintf( "%05d", corte ),
                         ".csv" )
 
-    fwrite(  dscheck[ , list( num_cli, Predicted ) ],
+    fwrite(  dscheck[ , list( numero_de_cliente, Predicted ) ],
              file= nom_submit,
              sep= "," )
 
@@ -170,7 +172,7 @@ results[, "prob_rank_avg"] <- 0
 results
 for( corte in cortes ) {
   dscheck = data.table()
-  dscheck$num_cli = models$num_cli
+  dscheck$numero_de_cliente = models$numero_de_cliente
   dscheck$prob = models[,"prob_rank_avg"]
   setorder( dscheck, prob )
   dscheck[  , Predicted := 0L ]

@@ -9,12 +9,13 @@ rm( list=ls() )  #remove all objects
 gc()             #garbage collection
 
 require("data.table")
+require("primes")
 
 require("lightgbm")
 
 #Parametros del script
 PARAM  <- list()
-PARAM$experimento  <- "ZZ9410_4_OSEPT"
+PARAM$experimento  <- "ZZ9410_4_OSEPT_SEM"
 PARAM$exp_input  <- "HT9410_4_OSEPT"
 
 PARAM$modelos  <- 2
@@ -55,6 +56,11 @@ dataset  <- fread( arch_dataset )
 arch_future  <- paste0( base_dir, "exp/", TS, "/dataset_future.csv.gz" )
 dfuture <- fread( arch_future )
 
+# Semillerio
+#genero un vector de una cantidad de ksemillerio  de semillas,  buscando numeros primos al azar
+primos  <- generate_primes(min=100000, max=1000000)  #genero TODOS los numeros primos entre 100k y 1M
+set.seed( PARAM$semilla_primos ) #seteo la semilla que controla al sample de los primos
+sample_semillas  <- sample(primos)[ 1:PARAM$semillerio ]   #me quedo con  PARAM$semillerio primos al azar
 
 #defino la clase binaria
 dataset[ , clase01 := ifelse( clase_ternaria %in% c("BAJA+1","BAJA+2"), 1, 0 )  ]
@@ -94,48 +100,55 @@ for( i in  1:PARAM$modelos )
   parametros$ganancia     <- NULL
   parametros$iteracion_bayesiana  <- NULL
 
-  #Utilizo la semilla definida en este script
-  parametros$seed  <- ksemilla
-  
-  #genero el modelo entrenando en los datos finales
-  set.seed( parametros$seed )
-  modelo_final  <- lightgbm( data= dtrain,
-                             param=  parametros,
-                             verbose= -100 )
 
-  #grabo el modelo, achivo .model
-  lgb.save( modelo_final,
-            file= arch_modelo )
+  for (ksemilla in sample_semillas[1:40]) {
 
-  #creo y grabo la importancia de variables
-  tb_importancia  <- as.data.table( lgb.importance( modelo_final ) )
-  fwrite( tb_importancia,
-          file= paste0( "impo_", 
+    #Utilizo la semilla definida en este script
+    parametros$seed  <- ksemilla
+    
+    #genero el modelo entrenando en los datos finales
+    set.seed( parametros$seed )
+    modelo_final  <- lightgbm( data= dtrain,
+                              param=  parametros,
+                              verbose= -100 )
+
+    #grabo el modelo, achivo .model
+    lgb.save( modelo_final,
+              file= arch_modelo )
+
+    #creo y grabo la importancia de variables
+    tb_importancia  <- as.data.table( lgb.importance( modelo_final ) )
+    fwrite( tb_importancia,
+            file= paste0( "impo_", 
+                          sprintf( "%02d", i ),
+                          "_",
+                          sprintf( "%03d", iteracion_bayesiana ),
+                          "_",
+                          sprintf( "%03d", ksemilla ),
+                          ".txt" ),
+            sep= "\t" )
+
+
+    #genero la prediccion, Scoring
+    prediccion  <- predict( modelo_final,
+                            data.matrix( dfuture[ , campos_buenos, with=FALSE ] ) )
+
+    tb_prediccion  <- dfuture[  , list( numero_de_cliente, foto_mes ) ]
+    tb_prediccion[ , prob := prediccion ]
+
+
+    nom_pred  <- paste0( "pred_",
                         sprintf( "%02d", i ),
                         "_",
-                        sprintf( "%03d", iteracion_bayesiana ),
-                        ".txt" ),
-          sep= "\t" )
+                        sprintf( "%03d", iteracion_bayesiana),
+                         "_",
+                          sprintf( "%03d", ksemilla ),
+                        ".csv"  )
 
-
-  #genero la prediccion, Scoring
-  prediccion  <- predict( modelo_final,
-                          data.matrix( dfuture[ , campos_buenos, with=FALSE ] ) )
-
-  tb_prediccion  <- dfuture[  , list( numero_de_cliente, foto_mes ) ]
-  tb_prediccion[ , prob := prediccion ]
-
-
-  nom_pred  <- paste0( "pred_",
-                       sprintf( "%02d", i ),
-                       "_",
-                       sprintf( "%03d", iteracion_bayesiana),
-                       ".csv"  )
-
-  fwrite( tb_prediccion,
-          file= nom_pred,
-          sep= "\t" )
-
+    fwrite( tb_prediccion,
+            file= nom_pred,
+            sep= "\t" )
+  }
 
   #genero los archivos para Kaggle
   cortes  <- seq( from=  7000,
@@ -145,25 +158,25 @@ for( i in  1:PARAM$modelos )
 
   setorder( tb_prediccion, -prob )
 
-  for( corte in cortes )
-  {
-    tb_prediccion[  , Predicted := 0L ]
-    tb_prediccion[ 1:corte, Predicted := 1L ]
+  # for( corte in cortes )
+  # {
+  #   tb_prediccion[  , Predicted := 0L ]
+  #   tb_prediccion[ 1:corte, Predicted := 1L ]
 
-    nom_submit  <- paste0( PARAM$experimento, 
-                           "_",
-                           sprintf( "%02d", i ),
-                           "_",
-                           sprintf( "%03d", iteracion_bayesiana ),
-                           "_",
-                           sprintf( "%05d", corte ),
-                           ".csv" )
+  #   nom_submit  <- paste0( PARAM$experimento, 
+  #                          "_",
+  #                          sprintf( "%02d", i ),
+  #                          "_",
+  #                          sprintf( "%03d", iteracion_bayesiana ),
+  #                          "_",
+  #                          sprintf( "%05d", corte ),
+  #                          ".csv" )
 
-    fwrite(  tb_prediccion[ , list( numero_de_cliente, Predicted ) ],
-             file= nom_submit,
-             sep= "," )
+  #   fwrite(  tb_prediccion[ , list( numero_de_cliente, Predicted ) ],
+  #            file= nom_submit,
+  #            sep= "," )
 
-  }
+  # }
 
 
   #borro y limpio la memoria para la vuelta siguiente del for
