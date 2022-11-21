@@ -876,6 +876,7 @@ config <- configuration()
 
 #cargo el dataset, aqui debe poner  SU RUTA
 dataset <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competencia1_2022.csv")
+datasetFinal <- fread("/Users/dfontenla/Maestria/2022C2/DMEyF/datasets/competenciaFINAL_2022.csv.gz")
 
 #creo la clase_binaria  SI= {BAJA+1, BAJA+2}  NO={CONTINUA}
 dataset[ foto_mes==202101, clase_binaria :=  ifelse( clase_ternaria=="CONTINUA", "NO", "SI" ) ]
