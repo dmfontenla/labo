@@ -16,7 +16,7 @@ require("primes")
 
 #Parametros del script
 PARAM <- list()
-PARAM$experimento <- "ZZ9410_semillerio_ensamble_mc3_OLD"
+PARAM$experimento <- "ZZ9410_semillerio_ensamble_BMOLD"
 PARAM$exp_input <- "HT9420_4_BMC3_OLD"
 
 # PARAM$modelos  <- 2
